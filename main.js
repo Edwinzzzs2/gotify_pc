@@ -1,0 +1,551 @@
+const path = require("node:path");
+const fs = require("node:fs");
+const { app, BrowserWindow, ipcMain, Menu, Tray, Notification, nativeImage, screen, dialog } = require("electron");
+const { ConfigStore } = require("./src/services/config-store");
+const { HistoryStore } = require("./src/services/history-store");
+const { GotifyClient, testConnection } = require("./src/services/gotify-client");
+
+let mainWindow = null;
+let tray = null;
+let configStore = null;
+let historyStore = null;
+let gotifyClient = null;
+let appIcon = null;
+let currentConnectionStatus = { connected: false, status: "未连接" };
+let customNotificationWindow = null;
+let customNotificationTimer = null;
+let storageDirPath = "";
+let applicationMap = new Map();
+let applicationList = [];
+let lastApplicationsFetchedAt = 0;
+const APP_NAME = "Gotify 客户端";
+const APP_USER_MODEL_ID = "com.gotify.client.desktop";
+
+app.setName(APP_NAME);
+if (process.platform === "win32") {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
+}
+Menu.setApplicationMenu(null);
+
+function resolveStorageDir() {
+  const ensureWritable = (dir) => {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.accessSync(dir, fs.constants.W_OK);
+    return dir;
+  };
+  const getPreferencePath = () => path.join(app.getPath("userData"), "storage-preferences.json");
+  const readPreferredDir = () => {
+    try {
+      const prefPath = getPreferencePath();
+      if (!fs.existsSync(prefPath)) {
+        return "";
+      }
+      const raw = fs.readFileSync(prefPath, "utf8");
+      const parsed = JSON.parse(raw);
+      return String(parsed?.storageDir || "").trim();
+    } catch {
+      return "";
+    }
+  };
+  const candidates = [];
+  const envPath = String(process.env.GOTIFY_DATA_DIR || "").trim();
+  if (envPath) {
+    candidates.push(envPath);
+  }
+  const preferredPath = readPreferredDir();
+  if (preferredPath) {
+    candidates.push(preferredPath);
+  }
+  if (app.isPackaged) {
+    candidates.push(path.dirname(process.execPath));
+  } else {
+    candidates.push(__dirname);
+  }
+  candidates.push(app.getPath("userData"));
+  for (const dir of candidates) {
+    try {
+      return ensureWritable(dir);
+    } catch {}
+  }
+  return app.getPath("userData");
+}
+
+function getStoragePreferencePath() {
+  return path.join(app.getPath("userData"), "storage-preferences.json");
+}
+
+function savePreferredStorageDir(nextPath) {
+  const prefPath = getStoragePreferencePath();
+  fs.mkdirSync(path.dirname(prefPath), { recursive: true });
+  fs.writeFileSync(prefPath, JSON.stringify({ storageDir: nextPath }, null, 2), "utf8");
+}
+
+function ensureWritableDir(nextPath) {
+  fs.mkdirSync(nextPath, { recursive: true });
+  fs.accessSync(nextPath, fs.constants.W_OK);
+}
+
+function copyDataFiles(sourceDir, targetDir) {
+  const fileNames = ["config.json", "message_history.json"];
+  for (const fileName of fileNames) {
+    const source = path.join(sourceDir, fileName);
+    const target = path.join(targetDir, fileName);
+    if (fs.existsSync(source) && !fs.existsSync(target)) {
+      fs.copyFileSync(source, target);
+    }
+  }
+}
+
+function createGotifyIcon() {
+  const runtimeIconPath = path.resolve(__dirname, "defaultapp.png");
+  if (fs.existsSync(runtimeIconPath)) {
+    const runtimeIcon = nativeImage.createFromPath(runtimeIconPath);
+    if (!runtimeIcon.isEmpty()) {
+      return runtimeIcon;
+    }
+  }
+  const officialIconPath = path.resolve(__dirname, "..", "GotifyClient", "gotify.ico");
+  if (fs.existsSync(officialIconPath)) {
+    const officialIcon = nativeImage.createFromPath(officialIconPath);
+    if (!officialIcon.isEmpty()) {
+      return officialIcon;
+    }
+  }
+  const size = 64;
+  const data = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const i = (y * size + x) * 4;
+      data[i] = 0xd2;
+      data[i + 1] = 0x76;
+      data[i + 2] = 0x19;
+      data[i + 3] = 0xff;
+      const dx = x - 32;
+      const dy = y - 26;
+      const body = dx * dx + dy * dy <= 15 * 15 && dy >= -7;
+      const top = dx * dx + (y - 14) * (y - 14) <= 5 * 5;
+      const bellGap = dx * dx + (y - 26) * (y - 26) <= 7 * 7;
+      if (body || top) {
+        data[i] = 0xff;
+        data[i + 1] = 0xff;
+        data[i + 2] = 0xff;
+        data[i + 3] = 0xff;
+      }
+      if (bellGap) {
+        data[i] = 0xd2;
+        data[i + 1] = 0x76;
+        data[i + 2] = 0x19;
+        data[i + 3] = 0xff;
+      }
+      const dot = dx * dx + (y - 44) * (y - 44) <= 5 * 5;
+      if (dot) {
+        data[i] = 0xff;
+        data[i + 1] = 0xff;
+        data[i + 2] = 0xff;
+        data[i + 3] = 0xff;
+      }
+    }
+  }
+  const icon = nativeImage.createFromBitmap(data, { width: size, height: size, scaleFactor: 1 });
+  return icon.isEmpty() ? nativeImage.createEmpty() : icon;
+}
+
+async function refreshApplications(config, force = false) {
+  const serverUrl = String(config?.serverUrl || "").trim();
+  const clientToken = String(config?.clientToken || "").trim();
+  if (!serverUrl || !clientToken) {
+    applicationMap = new Map();
+    applicationList = [];
+    lastApplicationsFetchedAt = 0;
+    return applicationList;
+  }
+  if (!force && lastApplicationsFetchedAt && Date.now() - lastApplicationsFetchedAt < 15000) {
+    return applicationList;
+  }
+  const normalized = serverUrl.replace(/\/+$/, "");
+  const url = `${normalized}/application?token=${encodeURIComponent(clientToken)}`;
+  try {
+    const response = await fetch(url, { method: "GET" });
+    if (!response.ok) {
+      return applicationList;
+    }
+    const data = await response.json();
+    if (!Array.isArray(data)) {
+      return applicationList;
+    }
+    applicationList = data
+      .map((item) => ({ id: Number(item.id || 0), name: String(item.name || "").trim() }))
+      .filter((item) => item.id > 0 && item.name);
+    applicationMap = new Map(applicationList.map((item) => [item.id, item.name]));
+    lastApplicationsFetchedAt = Date.now();
+    return applicationList;
+  } catch {
+    return applicationList;
+  }
+}
+
+function getAppNameById(appid) {
+  const id = Number(appid || 0);
+  return applicationMap.get(id) || "";
+}
+
+function createWindow() {
+  const config = configStore.get();
+  mainWindow = new BrowserWindow({
+    width: 980,
+    height: 720,
+    minWidth: 760,
+    minHeight: 520,
+    icon: appIcon,
+    backgroundColor: "#f7fafc",
+    show: Boolean(config.showMainWindowOnStartup),
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  mainWindow.loadFile(path.join(__dirname, "index.html"));
+  mainWindow.webContents.on("before-input-event", (_, input) => {
+    if (input.key === "F12" || (input.control && input.shift && input.key.toUpperCase() === "I")) {
+      if (mainWindow.webContents.isDevToolsOpened()) {
+        mainWindow.webContents.closeDevTools();
+      } else {
+        mainWindow.webContents.openDevTools({ mode: "detach" });
+      }
+    }
+  });
+  mainWindow.on("close", (event) => {
+    if (!app.isQuiting && configStore.get().minimizeToTray) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+}
+
+function createTray() {
+  const trayIcon = appIcon.resize({ width: 16, height: 16 });
+  tray = new Tray(trayIcon);
+  const contextMenu = Menu.buildFromTemplate([
+    { label: "显示主界面", click: () => mainWindow?.show() },
+    { label: "设置", click: () => mainWindow?.webContents.send("open-settings") },
+    { type: "separator" },
+    { label: "退出", click: () => quitApp() }
+  ]);
+  tray.setToolTip("Gotify 客户端");
+  tray.setContextMenu(contextMenu);
+  tray.on("click", () => mainWindow?.show());
+}
+
+const NOTIFICATION_WIDTH = 360;
+const NOTIFICATION_HEIGHT = 96;
+const NOTIFICATION_GAP = 10;
+const MAX_NOTIFICATIONS = 5;
+
+let activeNotifications = [];
+
+function closeCustomNotificationWindow(windowId) {
+  if (!windowId) {
+    // Close all
+    activeNotifications.forEach((n) => {
+      if (n.timer) clearTimeout(n.timer);
+      if (n.window && !n.window.isDestroyed()) n.window.close();
+    });
+    activeNotifications = [];
+    return;
+  }
+
+  const index = activeNotifications.findIndex((n) => n.id === windowId);
+  if (index !== -1) {
+    const notification = activeNotifications[index];
+    if (notification.timer) clearTimeout(notification.timer);
+    if (notification.window && !notification.window.isDestroyed()) {
+      notification.window.close();
+    }
+    activeNotifications.splice(index, 1);
+    repositionNotifications();
+  }
+}
+
+function repositionNotifications() {
+  const workArea = screen.getPrimaryDisplay().workArea;
+  activeNotifications.forEach((n, i) => {
+    if (n.window && !n.window.isDestroyed()) {
+      const newY = workArea.y + workArea.height - (NOTIFICATION_HEIGHT + NOTIFICATION_GAP) * (i + 1) - 6;
+      n.window.setPosition(workArea.x + workArea.width - NOTIFICATION_WIDTH - 16, newY, true);
+    }
+  });
+}
+
+function buildCustomNotificationHtml({ iconDataUrl, title, subtitle, body, id }) {
+  const escapeHtml = (text) =>
+    String(text || "")
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;");
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; overflow: hidden; background: transparent; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
+    .card { width: ${NOTIFICATION_WIDTH}px; min-height: ${NOTIFICATION_HEIGHT}px; border-radius: 14px; background: linear-gradient(180deg, #1c2737 0%, #131c29 100%); color: #f1f5f9; padding: 12px; display: flex; gap: 10px; box-shadow: 0 14px 30px rgba(0,0,0,0.35); border: 1px solid rgba(148,163,184,0.22); animation: popup .18s ease-out; cursor: pointer; }
+    @keyframes popup { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .avatar { width: 36px; height: 36px; border-radius: 8px; background: transparent; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
+    .avatar img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .main { min-width: 0; flex: 1; }
+    .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .title { font-size: 15px; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .close { border: none; background: transparent; color: #94a3b8; font-size: 14px; width: 22px; height: 22px; cursor: pointer; border-radius: 6px; line-height: 22px; }
+    .close:hover { background: rgba(148,163,184,0.18); color: #e2e8f0; }
+    .subtitle { margin-top: 1px; font-size: 12px; color: #93c5fd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .body { margin-top: 3px; font-size: 13px; line-height: 1.35; color: #e2e8f0; white-space: pre-line; max-height: 36px; overflow: hidden; }
+  </style>
+</head>
+<body>
+  <div id="card" class="card">
+    <div class="avatar"><img src="${iconDataUrl}" alt="icon" /></div>
+    <div class="main">
+      <div class="top">
+        <div class="title">${escapeHtml(title)}</div>
+        <button id="close" class="close">✕</button>
+      </div>
+      <div class="subtitle">${escapeHtml(subtitle)}</div>
+      <div class="body">${escapeHtml(body)}</div>
+    </div>
+  </div>
+  <script>
+    const { ipcRenderer } = require("electron");
+    const closeButton = document.getElementById("close");
+    const card = document.getElementById("card");
+    closeButton.addEventListener("click", (event) => {
+      event.stopPropagation();
+      ipcRenderer.send("custom-notification-close", "${id}");
+    });
+    card.addEventListener("click", () => {
+      ipcRenderer.send("custom-notification-open-main", "${id}");
+    });
+  </script>
+</body>
+</html>`;
+}
+
+function showCustomNotification(message, config) {
+  if (activeNotifications.length >= MAX_NOTIFICATIONS) {
+    const oldest = activeNotifications.shift();
+    if (oldest) {
+      if (oldest.timer) clearTimeout(oldest.timer);
+      if (oldest.window && !oldest.window.isDestroyed()) oldest.window.close();
+    }
+  }
+
+  const workArea = screen.getPrimaryDisplay().workArea;
+  const id = Math.random().toString(36).substring(7);
+  
+  const title = message.title || "Gotify 消息";
+  const subtitle = message.appname || `应用 #${message.appid || 0}`;
+  const body = formatNotificationBody(message.message);
+  const iconDataUrl = appIcon.resize({ width: 64, height: 64 }).toDataURL();
+  const html = buildCustomNotificationHtml({ iconDataUrl, title, subtitle, body, id });
+  
+  const notificationWindow = new BrowserWindow({
+    width: NOTIFICATION_WIDTH,
+    height: NOTIFICATION_HEIGHT,
+    x: workArea.x + workArea.width - NOTIFICATION_WIDTH - 16,
+    y: workArea.y + workArea.height - (NOTIFICATION_HEIGHT + NOTIFICATION_GAP) * (activeNotifications.length + 1) - 6,
+    frame: false,
+    resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    closable: true,
+    skipTaskbar: true,
+    transparent: true,
+    focusable: false,
+    alwaysOnTop: true,
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    }
+  });
+
+  const notificationData = {
+    id,
+    window: notificationWindow,
+    timer: null
+  };
+
+  notificationWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  notificationWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
+  notificationWindow.once("ready-to-show", () => notificationWindow?.showInactive());
+  
+  if (!config.notificationNeverClose && config.notificationAutoHide) {
+    const duration = Math.max(1000, Number(config.notificationDuration) || 5000);
+    notificationData.timer = setTimeout(() => closeCustomNotificationWindow(id), duration);
+  }
+
+  activeNotifications.push(notificationData);
+}
+
+function formatNotificationBody(rawText) {
+  const text = String(rawText || "").trim();
+  if (!text) {
+    return "收到一条新消息";
+  }
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 4);
+  const merged = lines.join("\n");
+  return merged.length > 200 ? `${merged.slice(0, 200)}...` : merged;
+}
+
+function bindGotifyEvents() {
+  gotifyClient.on("status", (payload) => {
+    currentConnectionStatus = payload;
+    mainWindow?.webContents.send("connection-status", payload);
+  });
+  gotifyClient.on("message", (message) => {
+    const appName = getAppNameById(message.appid);
+    const enriched = appName ? { ...message, appname: appName } : message;
+    historyStore.add(enriched);
+    mainWindow?.webContents.send("new-message", enriched);
+    const config = configStore.get();
+    if (config.showCustomNotification) {
+      showCustomNotification(enriched, config);
+    } else {
+      const notification = new Notification({
+        title: enriched.title || "Gotify 消息",
+        body: formatNotificationBody(enriched.message),
+        icon: appIcon.resize({ width: 64, height: 64 }),
+        silent: !config.playSound
+      });
+      notification.on("click", () => mainWindow?.show());
+      notification.show();
+    }
+  });
+}
+
+function setupIpc() {
+  ipcMain.handle("config:get", () => configStore.get());
+  ipcMain.handle("config:save", async (_, nextConfig) => {
+    const saved = configStore.save(nextConfig);
+    gotifyClient.stop();
+    if (saved.serverUrl && saved.clientToken) {
+      gotifyClient.start(saved);
+      await refreshApplications(saved, true);
+    }
+    return saved;
+  });
+  ipcMain.handle("messages:get", () => historyStore.getAll());
+  ipcMain.handle("messages:clear", () => {
+    try {
+      historyStore.clear();
+      mainWindow?.webContents.send("messages-cleared");
+      return true;
+    } catch (error) {
+      return false;
+    }
+  });
+  ipcMain.handle("connection:test", async (_, payload) => {
+    await testConnection(payload.serverUrl, payload.clientToken);
+    return true;
+  });
+  ipcMain.handle("connection:toggle", () => {
+    const config = configStore.get();
+    if (gotifyClient.connected) {
+      gotifyClient.stop();
+      return { connected: false };
+    }
+    gotifyClient.start(config);
+    refreshApplications(config, true);
+    return { connected: true };
+  });
+  ipcMain.handle("connection:getStatus", () => currentConnectionStatus);
+  ipcMain.handle("applications:get", async () => {
+    const config = configStore.get();
+    return refreshApplications(config, false);
+  });
+  ipcMain.handle("storage:getPath", () => ({
+    path: storageDirPath,
+    lockedByEnv: Boolean(String(process.env.GOTIFY_DATA_DIR || "").trim())
+  }));
+  ipcMain.handle("storage:pickPath", async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ["openDirectory", "createDirectory"]
+    });
+    if (result.canceled || !result.filePaths?.length) {
+      return "";
+    }
+    return result.filePaths[0];
+  });
+  ipcMain.handle("storage:setPath", (_, nextPath) => {
+    const envPath = String(process.env.GOTIFY_DATA_DIR || "").trim();
+    if (envPath) {
+      throw new Error("检测到 GOTIFY_DATA_DIR 已设置，无法在界面修改路径");
+    }
+    const normalized = path.resolve(String(nextPath || "").trim());
+    if (!normalized) {
+      throw new Error("存储路径不能为空");
+    }
+    ensureWritableDir(normalized);
+    copyDataFiles(storageDirPath, normalized);
+    savePreferredStorageDir(normalized);
+    const changed = normalized !== storageDirPath;
+    storageDirPath = normalized;
+    return { changed, path: normalized, restartRequired: changed };
+  });
+  ipcMain.on("custom-notification-open-main", (_, windowId) => {
+    closeCustomNotificationWindow(windowId);
+    if (mainWindow) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+  ipcMain.on("custom-notification-close", (_, windowId) => {
+    closeCustomNotificationWindow(windowId);
+  });
+}
+
+function quitApp() {
+  app.isQuiting = true;
+  closeCustomNotificationWindow();
+  gotifyClient?.stop();
+  tray?.destroy();
+  app.quit();
+}
+
+app.whenReady().then(() => {
+  appIcon = createGotifyIcon();
+  storageDirPath = resolveStorageDir();
+  configStore = new ConfigStore(storageDirPath);
+  historyStore = new HistoryStore(storageDirPath);
+  gotifyClient = new GotifyClient();
+  bindGotifyEvents();
+  setupIpc();
+  createWindow();
+  createTray();
+  mainWindow?.webContents.on("did-finish-load", () => {
+    mainWindow?.webContents.send("connection-status", currentConnectionStatus);
+  });
+  const config = configStore.get();
+  if (config.serverUrl && config.clientToken) {
+    gotifyClient.start(config);
+    refreshApplications(config, true);
+  } else {
+    mainWindow?.webContents.once("did-finish-load", () => {
+      mainWindow?.webContents.send("connection-status", { connected: false, status: "未连接" });
+    });
+  }
+});
+
+app.on("window-all-closed", (event) => {
+  event.preventDefault();
+});
+
+app.on("activate", () => {
+  if (!mainWindow) {
+    createWindow();
+  } else {
+    mainWindow.show();
+  }
+});

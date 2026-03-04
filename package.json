@@ -1,0 +1,74 @@
+{
+  "name": "gotify-pc",
+  "version": "0.1.0",
+  "description": "Gotify PC client based on Electron",
+  "main": "main.js",
+  "scripts": {
+    "start": "npm run build:assets && electron .",
+    "lint": "node --check main.js && node --check preload.js && node --check src/services/config-store.js && node --check src/services/history-store.js && node --check src/services/gotify-client.js",
+    "prepare:icon": "node scripts/prepare-icon.js",
+    "build:css": "npx tailwindcss -i src/tailwind.css -o assets/tailwind.css --minify",
+    "build:renderer": "npx esbuild renderer.tsx --bundle --platform=browser --format=esm --target=es2018 --jsx=automatic --outfile=renderer.js",
+    "build:assets": "npm run build:css && npm run build:renderer",
+    "pack": "npm run build:assets && npm run prepare:icon && electron-builder --dir",
+    "repack": "node scripts/repack-win.js",
+    "repack:icon": "electron-builder --dir --config.directories.output=dist-repack-icon --config.win.signAndEditExecutable=true",
+    "build": "npm run build:assets && npm run prepare:icon && electron-builder",
+    "build:win": "npm run build:assets && npm run prepare:icon && electron-builder --win",
+    "build:win:clean": "node scripts/build-win-clean.js"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.25.0",
+    "png-to-ico": "^2.1.8",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "tailwindcss": "^3.4.17"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "build": {
+    "appId": "com.gotify.client.desktop",
+    "productName": "GotifyClient",
+    "electronDist": "node_modules/electron/dist",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer.js",
+      "renderer.tsx",
+      "index.html",
+      "defaultapp.png",
+      "assets/**/*",
+      "src/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "icon": "build/defaultapp.ico",
+      "signAndEditExecutable": false,
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "installerIcon": "build/defaultapp.ico",
+      "uninstallerIcon": "build/defaultapp.ico",
+      "installerHeaderIcon": "build/defaultapp.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
