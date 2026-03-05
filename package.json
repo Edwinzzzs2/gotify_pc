@@ -24,6 +24,7 @@
     "electron-builder": "^24.13.3",
     "esbuild": "^0.25.0",
     "png-to-ico": "^2.1.8",
+    "rcedit": "^5.0.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "tailwindcss": "^3.4.17",
@@ -52,6 +53,7 @@
       "package.json"
     ],
     "asar": true,
+    "afterPack": "./scripts/after-pack.js",
     "win": {
       "icon": "build/defaultapp.ico",
       "signAndEditExecutable": false,
