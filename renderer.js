@@ -24573,11 +24573,28 @@ function SettingsModal({
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4 text-[14px]", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-3", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "w-32 text-[14px] font-bold whitespace-nowrap", children: "\u670D\u52A1\u5668\u5730\u5740:" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { value: config.serverUrl, onChange: onServerUrlChange, placeholder: "https://your-gotify.example.com", className: "h-9 flex-1 rounded border px-3 text-[14px] outline-none focus:border-blue-500" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "input",
+            {
+              value: config.serverUrl,
+              onChange: onServerUrlChange,
+              placeholder: "https://your-gotify.example.com",
+              className: "h-9 flex-1 rounded border px-3 text-[14px] outline-none focus:border-blue-500"
+            }
+          )
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-3", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "w-32 text-[14px] font-bold whitespace-nowrap", children: "\u5BA2\u6237\u7AEF\u4EE4\u724C:" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: showToken ? "text" : "password", value: config.clientToken, onChange: onTokenChange, placeholder: "Client Token", className: "h-9 flex-1 rounded border px-3 text-[14px] outline-none focus:border-blue-500" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "input",
+            {
+              type: showToken ? "text" : "password",
+              value: config.clientToken,
+              onChange: onTokenChange,
+              placeholder: "Client Token",
+              className: "h-9 flex-1 rounded border px-3 text-[14px] outline-none focus:border-blue-500"
+            }
+          ),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: () => setShowToken((v) => !v), className: "h-9 rounded border px-3 text-[13px]", children: showToken ? "\u9690\u85CF" : "\u663E\u793A" })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded border bg-slate-50 p-3", children: [
@@ -24606,7 +24623,18 @@ function SettingsModal({
           ] }) }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-2 flex items-center gap-2 text-[14px]", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "whitespace-nowrap", children: "\u901A\u77E5\u6301\u7EED\u65F6\u95F4(\u6BEB\u79D2):" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "number", value: config.notificationDuration, onChange: onDurationChange, min: 1e3, step: 1e3, disabled: !config.notificationAutoHide || config.notificationNeverClose, className: "h-9 w-28 rounded border px-2 text-[14px] disabled:bg-slate-100" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "input",
+              {
+                type: "number",
+                value: config.notificationDuration,
+                onChange: onDurationChange,
+                min: 1e3,
+                step: 1e3,
+                disabled: !config.notificationAutoHide || config.notificationNeverClose,
+                className: "h-9 w-28 rounded border px-2 text-[14px] disabled:bg-slate-100"
+              }
+            ),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-slate-500 whitespace-nowrap", children: "(\u4EC5\u5728\u81EA\u52A8\u6D88\u5931\u542F\u7528\u65F6)" })
           ] })
         ] }),
@@ -24639,19 +24667,35 @@ function SettingsModal({
                   className: "h-9 flex-1 rounded border px-2 text-[13px] outline-none focus:border-blue-500 disabled:bg-slate-100"
                 }
               ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: onPickStoragePath, disabled: storageLockedByEnv || applyingStoragePath, className: "h-9 rounded border px-3 text-[12px] disabled:opacity-50", children: "\u6D4F\u89C8" }),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: onApplyStoragePath, disabled: storageLockedByEnv || applyingStoragePath, className: "h-9 rounded border border-blue-500 px-3 text-[12px] text-blue-600 disabled:opacity-50", children: applyingStoragePath ? "\u5E94\u7528\u4E2D..." : "\u5E94\u7528\u8DEF\u5F84" })
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  onClick: onPickStoragePath,
+                  disabled: storageLockedByEnv || applyingStoragePath,
+                  className: "h-9 rounded border px-3 text-[12px] disabled:opacity-50",
+                  children: "\u6D4F\u89C8"
+                }
+              ),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  onClick: onApplyStoragePath,
+                  disabled: storageLockedByEnv || applyingStoragePath,
+                  className: "h-9 rounded border border-blue-500 px-3 text-[12px] text-blue-600 disabled:opacity-50",
+                  children: applyingStoragePath ? "\u5E94\u7528\u4E2D..." : "\u5E94\u7528\u8DEF\u5F84"
+                }
+              )
             ] }),
             storageLockedByEnv ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[12px] text-amber-600", children: "\u5DF2\u68C0\u6D4B\u5230 GOTIFY_DATA_DIR\uFF0C\u754C\u9762\u8DEF\u5F84\u4FEE\u6539\u5DF2\u9501\u5B9A" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[12px] text-slate-400", children: "\u4FEE\u6539\u540E\u4F1A\u8FC1\u79FB\u7F13\u5B58\u6587\u4EF6\uFF0C\u91CD\u542F\u5E94\u7528\u540E\u751F\u6548" })
           ] })
         ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "shrink-0 flex items-center justify-between gap-3 border-t bg-slate-50 px-5 py-3", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: `min-h-[20px] text-[12px] ${(notice == null ? void 0 : notice.type) === "error" ? "text-red-600" : "text-blue-600"}`, children: (notice == null ? void 0 : notice.text) || "" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2", children: [
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: onTest, disabled: testing, className: "h-9 rounded border px-3 text-[13px] disabled:opacity-50", children: testing ? "\u6D4B\u8BD5\u4E2D..." : "\u6D4B\u8BD5\u8FDE\u63A5" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: onSave, disabled: saving, className: "h-9 rounded bg-blue-600 px-3 text-[13px] text-white disabled:opacity-50", children: saving ? "\u4FDD\u5B58\u4E2D..." : "\u4FDD\u5B58" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: onClose, className: "h-9 rounded border px-3 text-[13px]", children: "\u53D6\u6D88" })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: `flex-1 min-w-0 break-words text-[14px] font-semibold leading-tight ${(notice == null ? void 0 : notice.type) === "error" ? "text-red-600" : "text-green-600"}`, children: (notice == null ? void 0 : notice.text) || "" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex shrink-0 items-center gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: onTest, disabled: testing, className: "h-9 whitespace-nowrap rounded border px-3 text-[13px] disabled:opacity-50", children: testing ? "\u6D4B\u8BD5\u4E2D..." : "\u6D4B\u8BD5\u8FDE\u63A5" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: onSave, disabled: saving, className: "h-9 whitespace-nowrap rounded bg-blue-600 px-3 text-[13px] text-white disabled:opacity-50", children: saving ? "\u4FDD\u5B58\u4E2D..." : "\u4FDD\u5B58" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: onClose, className: "h-9 whitespace-nowrap rounded border px-3 text-[13px]", children: "\u53D6\u6D88" })
         ] })
       ] })
     ] })
@@ -24763,13 +24807,6 @@ function App() {
     const timer = setTimeout(() => setBanner(""), 2500);
     return () => clearTimeout(timer);
   }, [banner]);
-  (0, import_react.useEffect)(() => {
-    if (!settingsNotice.text) {
-      return void 0;
-    }
-    const timer = setTimeout(() => setSettingsNotice({ text: "", type: "info" }), 2500);
-    return () => clearTimeout(timer);
-  }, [settingsNotice]);
   const statusColor = (0, import_react.useMemo)(() => {
     if (status.connected) return "text-green-600";
     if (status.status.includes("\u91CD\u8FDE")) return "text-amber-500";
@@ -24862,11 +24899,7 @@ function App() {
   const applicationOptions = (0, import_react.useMemo)(() => {
     const knownIds = new Set(applications.map((item) => item.id));
     const dynamicOptions = Array.from(appIdSet).filter((id) => !knownIds.has(id)).map((id) => ({ id: String(id), name: `\u5E94\u7528 #${id}` }));
-    return [
-      { id: "all", name: "\u5168\u90E8\u5206\u7EC4" },
-      ...applications.map((item) => ({ id: String(item.id), name: item.name })),
-      ...dynamicOptions
-    ];
+    return [{ id: "all", name: "\u5168\u90E8\u5206\u7EC4" }, ...applications.map((item) => ({ id: String(item.id), name: item.name })), ...dynamicOptions];
   }, [applications, appIdSet]);
   const getAppLabel = (appid) => {
     const id = Number(appid || 0);
@@ -24882,7 +24915,15 @@ function App() {
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between bg-white px-3 py-2 shadow-sm", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[16px] font-bold text-slate-700", children: "\u5386\u53F2\u6D88\u606F" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-3", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("select", { value: selectedAppId, onChange: (event) => setSelectedAppId(event.target.value), className: "h-8 rounded border border-slate-200 bg-white px-2 text-[12px] text-slate-600", children: applicationOptions.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: item.id, children: item.name }, item.id)) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "select",
+          {
+            value: selectedAppId,
+            onChange: (event) => setSelectedAppId(event.target.value),
+            className: "h-8 rounded border border-slate-200 bg-white px-2 text-[12px] text-slate-600",
+            children: applicationOptions.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("option", { value: item.id, children: item.name }, item.id))
+          }
+        ),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "text-[14px] text-slate-500", children: [
           visibleMessages.length,
           " \u6761\u6D88\u606F"
@@ -24900,7 +24941,15 @@ function App() {
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: onToggleConnection, className: "h-10 rounded border border-slate-200 px-4 text-[14px] text-slate-700", children: status.connected ? "\u65AD\u5F00" : "\u8FDE\u63A5" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: () => setSettingsOpen(true), className: "h-10 rounded border border-slate-200 px-4 text-[14px] text-slate-700", children: "\u8BBE\u7F6E" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: onClearMessages, disabled: visibleMessages.length === 0 || clearing, className: "h-10 rounded border border-red-400 px-4 text-[14px] text-red-500 disabled:opacity-40", children: clearing ? "\u6E05\u7A7A\u4E2D..." : "\u6E05\u7A7A\u6D88\u606F" })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              onClick: onClearMessages,
+              disabled: visibleMessages.length === 0 || clearing,
+              className: "h-10 rounded border border-red-400 px-4 text-[14px] text-red-500 disabled:opacity-40",
+              children: clearing ? "\u6E05\u7A7A\u4E2D..." : "\u6E05\u7A7A\u6D88\u606F"
+            }
+          )
         ] })
       ] })
     ] }),

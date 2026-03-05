@@ -277,12 +277,13 @@ function repositionNotifications() {
   });
 }
 
-function buildCustomNotificationHtml({ iconDataUrl, title, subtitle, body, id }) {
+function buildCustomNotificationHtml({ iconDataUrl, title, subtitle, body, id, verificationCode }) {
   const escapeHtml = (text) =>
     String(text || "")
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;");
+  const code = verificationCode || "";
   return `<!doctype html>
 <html lang="zh-CN">
 <head>
@@ -290,17 +291,19 @@ function buildCustomNotificationHtml({ iconDataUrl, title, subtitle, body, id })
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; padding: 0; overflow: hidden; background: transparent; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; }
-    .card { width: ${NOTIFICATION_WIDTH}px; min-height: ${NOTIFICATION_HEIGHT}px; border-radius: 14px; background: linear-gradient(180deg, #1c2737 0%, #131c29 100%); color: #f1f5f9; padding: 12px; display: flex; gap: 10px; box-shadow: 0 14px 30px rgba(0,0,0,0.35); border: 1px solid rgba(148,163,184,0.22); animation: popup .18s ease-out; cursor: pointer; }
+    .card { width: ${NOTIFICATION_WIDTH}px; min-height: ${NOTIFICATION_HEIGHT}px; border-radius: 14px; background: linear-gradient(180deg, #1c2737 0%, #131c29 100%); color: #f1f5f9; padding: 12px; display: flex; gap: 10px; box-shadow: 0 14px 30px rgba(0,0,0,0.35); border: 1px solid rgba(148,163,184,0.22); animation: popup .18s ease-out; cursor: pointer; transition: background 0.2s; }
+    .card:hover { background: linear-gradient(180deg, #253347 0%, #1a2535 100%); }
     @keyframes popup { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     .avatar { width: 36px; height: 36px; border-radius: 8px; background: transparent; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; }
     .avatar img { width: 100%; height: 100%; object-fit: contain; display: block; }
     .main { min-width: 0; flex: 1; }
     .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-    .title { font-size: 15px; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .close { border: none; background: transparent; color: #94a3b8; font-size: 14px; width: 22px; height: 22px; cursor: pointer; border-radius: 6px; line-height: 22px; }
+    .title { font-size: 15px; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+    .app-name { font-size: 13px; color: #93c5fd; font-weight: 400; margin-left: 4px; }
+    .close { border: none; background: transparent; color: #94a3b8; font-size: 14px; width: 22px; height: 22px; cursor: pointer; border-radius: 6px; line-height: 22px; flex-shrink: 0; }
     .close:hover { background: rgba(148,163,184,0.18); color: #e2e8f0; }
-    .subtitle { margin-top: 1px; font-size: 12px; color: #93c5fd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .body { margin-top: 3px; font-size: 13px; line-height: 1.35; color: #e2e8f0; white-space: pre-line; max-height: 36px; overflow: hidden; }
+    .body { margin-top: 6px; font-size: 13px; line-height: 1.35; color: #e2e8f0; white-space: pre-line; max-height: 54px; overflow: hidden; }
+    .code-hint { display: ${code ? "inline-block" : "none"}; font-size: 11px; color: #4ade80; background: rgba(74, 222, 128, 0.15); padding: 1px 6px; border-radius: 4px; margin-left: 8px; vertical-align: middle; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -308,10 +311,12 @@ function buildCustomNotificationHtml({ iconDataUrl, title, subtitle, body, id })
     <div class="avatar"><img src="${iconDataUrl}" alt="icon" /></div>
     <div class="main">
       <div class="top">
-        <div class="title">${escapeHtml(title)}</div>
+        <div class="title-container" style="display:flex;align-items:center;min-width:0;flex:1;margin-right:4px">
+          <div class="title">${escapeHtml(title)}<span class="app-name">(${escapeHtml(subtitle)})</span></div>
+          <div class="code-hint">点击复制验证码</div>
+        </div>
         <button id="close" class="close">✕</button>
       </div>
-      <div class="subtitle">${escapeHtml(subtitle)}</div>
       <div class="body">${escapeHtml(body)}</div>
     </div>
   </div>
@@ -319,12 +324,36 @@ function buildCustomNotificationHtml({ iconDataUrl, title, subtitle, body, id })
     const { ipcRenderer } = require("electron");
     const closeButton = document.getElementById("close");
     const card = document.getElementById("card");
+    const verificationCode = "${code}";
+    
     closeButton.addEventListener("click", (event) => {
       event.stopPropagation();
       ipcRenderer.send("custom-notification-close", "${id}");
     });
+    
     card.addEventListener("click", () => {
-      ipcRenderer.send("custom-notification-open-main", "${id}");
+      if (verificationCode) {
+        ipcRenderer.send("custom-notification-copy-code", { id: "${id}", code: verificationCode });
+        const hint = document.querySelector(".code-hint");
+        if (hint) {
+          hint.innerText = "复制成功";
+          hint.style.color = "#ffffff";
+          hint.style.background = "#22c55e";
+        }
+        setTimeout(() => {
+          ipcRenderer.send("custom-notification-close", "${id}");
+        }, 1500);
+      } else {
+        ipcRenderer.send("custom-notification-open-main", "${id}");
+      }
+    });
+    
+    card.addEventListener("mouseenter", () => {
+      ipcRenderer.send("custom-notification-pause-timer", "${id}");
+    });
+    
+    card.addEventListener("mouseleave", () => {
+      ipcRenderer.send("custom-notification-resume-timer", "${id}");
     });
   </script>
 </body>
@@ -346,8 +375,18 @@ function showCustomNotification(message, config) {
   const title = message.title || "Gotify 消息";
   const subtitle = message.appname || `应用 #${message.appid || 0}`;
   const body = formatNotificationBody(message.message);
+  
+  let verificationCode = "";
+  const msgContent = String(message.message || "");
+  if ((title.includes("验证码") || msgContent.includes("验证码")) && /\d{4,8}/.test(msgContent)) {
+    const match = msgContent.match(/\d{4,8}/);
+    if (match) {
+      verificationCode = match[0];
+    }
+  }
+
   const iconDataUrl = appIcon.resize({ width: 64, height: 64 }).toDataURL();
-  const html = buildCustomNotificationHtml({ iconDataUrl, title, subtitle, body, id });
+  const html = buildCustomNotificationHtml({ iconDataUrl, title, subtitle, body, id, verificationCode });
   
   const notificationWindow = new BrowserWindow({
     width: NOTIFICATION_WIDTH,
@@ -394,7 +433,7 @@ function formatNotificationBody(rawText) {
   if (!text) {
     return "收到一条新消息";
   }
-  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 4);
+  const lines = text.split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 6);
   const merged = lines.join("\n");
   return merged.length > 200 ? `${merged.slice(0, 200)}...` : merged;
 }
@@ -413,13 +452,27 @@ function bindGotifyEvents() {
     if (config.showCustomNotification) {
       showCustomNotification(enriched, config);
     } else {
+      let verificationCode = "";
+      if (((enriched.title && enriched.title.includes("验证码")) || (enriched.message && enriched.message.includes("验证码"))) && /\d{4,8}/.test(enriched.message)) {
+        const match = enriched.message.match(/\d{4,8}/);
+        if (match) {
+          verificationCode = match[0];
+        }
+      }
+
       const notification = new Notification({
         title: enriched.title || "Gotify 消息",
-        body: formatNotificationBody(enriched.message),
+        body: formatNotificationBody(enriched.message) + (verificationCode ? " [点击复制验证码]" : ""),
         icon: appIcon.resize({ width: 64, height: 64 }),
         silent: !config.playSound
       });
-      notification.on("click", () => mainWindow?.show());
+      notification.on("click", () => {
+        if (verificationCode) {
+          const { clipboard } = require("electron");
+          clipboard.writeText(verificationCode);
+        }
+        mainWindow?.show();
+      });
       notification.show();
     }
   });
@@ -503,6 +556,28 @@ function setupIpc() {
   });
   ipcMain.on("custom-notification-close", (_, windowId) => {
     closeCustomNotificationWindow(windowId);
+  });
+  ipcMain.on("custom-notification-copy-code", (_, { id, code }) => {
+    if (code) {
+      const { clipboard } = require("electron");
+      clipboard.writeText(code);
+    }
+  });
+  ipcMain.on("custom-notification-pause-timer", (_, windowId) => {
+    const notification = activeNotifications.find((n) => n.id === windowId);
+    if (notification && notification.timer) {
+      clearTimeout(notification.timer);
+      notification.timer = null;
+    }
+  });
+  ipcMain.on("custom-notification-resume-timer", (_, windowId) => {
+    const notification = activeNotifications.find((n) => n.id === windowId);
+    const config = configStore.get();
+    if (notification && !config.notificationNeverClose && config.notificationAutoHide) {
+      if (notification.timer) clearTimeout(notification.timer);
+      const duration = Math.max(1000, Number(config.notificationDuration) || 5000);
+      notification.timer = setTimeout(() => closeCustomNotificationWindow(windowId), duration);
+    }
   });
 }
 
