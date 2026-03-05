@@ -1,6 +1,7 @@
 # Gotify PC 客户端
 
 ![Preview](assets/preview.png)
+![Message Notification](assets/message.png)
 
 基于 Electron 的 Gotify 桌面客户端，支持实时消息接收、托盘驻留、自定义通知窗、历史消息持久化、Windows 安装包构建。
 
@@ -8,6 +9,8 @@
 
 - 实时 WebSocket 接收 Gotify 消息
 - 自定义桌面通知窗（支持自动消失/常驻）
+- **自动识别验证码**：消息中包含验证码时，通知弹窗显示“复制”按钮，一键复制验证码
+- **智能通知交互**：鼠标悬停在通知弹窗上时自动暂停关闭倒计时
 - 历史消息本地存储与清空
 - 系统托盘菜单与最小化到托盘
 - 设置页支持查看/修改数据存储路径
