@@ -12,8 +12,11 @@ const DEFAULT_CONFIG = {
   notificationDuration: 5000,
   minimizeToTray: true,
   showMainWindowOnStartup: true,
+  autoLaunch: false,
   enableReconnect: true,
   autoRefreshInterval: 10000,
+  barkServerUrl: "",
+  barkForwardApps: [] as number[],
 };
 
 type Config = typeof DEFAULT_CONFIG;
@@ -26,6 +29,7 @@ type MessageItem = {
   priority?: number;
   title?: string;
   message?: string;
+  favorite?: boolean;
 };
 type StorageMeta = { path?: string; lockedByEnv?: boolean };
 type ConnectionStatus = { connected?: boolean; status?: string };
@@ -63,7 +67,9 @@ type GotifyAPI = {
   getStoragePath: () => Promise<StorageMeta>;
   pickStoragePath: () => Promise<string>;
   setStoragePath: (path: string) => Promise<{ path?: string; restartRequired?: boolean }>;
+  openStoragePath: () => Promise<void>;
   getApplications: () => Promise<ApplicationInfo[]>;
+  toggleFavorite: (id: number) => Promise<boolean>;
 };
 
 declare global {
@@ -99,6 +105,16 @@ function SettingsModal({
   storageLockedByEnv,
 }: SettingsModalProps) {
   const [showToken, setShowToken] = useState(false);
+  const [applications, setApplications] = useState<ApplicationInfo[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      window.gotifyAPI.getApplications().then((apps) => {
+        setApplications(Array.isArray(apps) ? apps : []);
+      });
+    }
+  }, [open]);
+
   const onServerUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
     setConfig((prev) => ({ ...prev, serverUrl: event.target.value }));
   };
@@ -131,8 +147,30 @@ function SettingsModal({
   const onShowOnStartupChange = (event: ChangeEvent<HTMLInputElement>) => {
     setConfig((prev) => ({ ...prev, showMainWindowOnStartup: event.target.checked }));
   };
+  const onAutoLaunchChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setConfig((prev) => ({ ...prev, autoLaunch: event.target.checked }));
+  };
+  const onBarkUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setConfig((prev) => ({ ...prev, barkServerUrl: event.target.value }));
+  };
+  const onBarkAppToggle = (id: number) => {
+    setConfig((prev) => {
+      const current = Array.isArray(prev.barkForwardApps) ? prev.barkForwardApps : [];
+      if (current.includes(id)) {
+        return { ...prev, barkForwardApps: current.filter((x) => x !== id) };
+      }
+      return { ...prev, barkForwardApps: [...current, id] };
+    });
+  };
   const onDraftStoragePathChange = (event: ChangeEvent<HTMLInputElement>) => {
     setDraftStoragePath(event.target.value);
+  };
+  const onOpenStoragePath = async () => {
+    try {
+      await window.gotifyAPI.openStoragePath();
+    } catch {
+      // ignore
+    }
   };
   if (!open) {
     return null;
@@ -206,6 +244,56 @@ function SettingsModal({
             </div>
           </div>
           <div className="rounded border bg-slate-50 p-3">
+            <div className="mb-2 text-[15px] font-bold">Bark 消息转发</div>
+            <div className="space-y-2">
+              <div className="text-[13px] text-slate-600">将收到的消息转发到 iOS Bark App</div>
+              <input
+                value={config.barkServerUrl || ""}
+                onChange={onBarkUrlChange}
+                placeholder="https://api.day.app/YOUR_KEY"
+                className="h-9 w-full rounded border px-2 text-[13px] outline-none focus:border-blue-500"
+              />
+              <div className="text-[12px] font-semibold text-slate-600">选择要转发的应用分组:</div>
+              <div className="max-h-24 overflow-y-auto rounded border bg-white p-2">
+                {applications.length === 0 ? (
+                  <div className="text-[12px] text-slate-400">暂无应用分组，请先连接服务器</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {applications.map((app) => (
+                      <label key={app.id} className="flex items-center gap-2 text-[12px] text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={config.barkForwardApps?.includes(app.id)}
+                          onChange={() => onBarkAppToggle(app.id)}
+                        />
+                        {app.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="rounded border bg-slate-50 p-3">
+            <div className="mb-2 text-[15px] font-bold">数据存储</div>
+            <div className="space-y-2">
+              <div className="text-[13px] text-slate-600">当前数据存储路径</div>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 rounded border bg-white px-2 py-1.5 text-[12px] text-slate-600 break-all">
+                  {storagePath || "-"}
+                </div>
+                <button
+                  onClick={onOpenStoragePath}
+                  disabled={!storagePath}
+                  className="h-8 whitespace-nowrap rounded border border-blue-500 px-3 text-[12px] text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:hover:bg-transparent"
+                >
+                  打开目录
+                </button>
+              </div>
+              <div className="text-[12px] text-slate-400">如需迁移数据，请手动复制文件到新目录</div>
+            </div>
+          </div>
+          <div className="rounded border bg-slate-50 p-3">
             <div className="mb-2 text-[15px] font-bold">其他设置</div>
             <div className="space-y-1.5 text-[14px]">
               <label className="flex items-center gap-2">
@@ -213,41 +301,13 @@ function SettingsModal({
                 最小化到系统托盘
               </label>
               <label className="flex items-center gap-2">
+                <input type="checkbox" checked={config.autoLaunch} onChange={onAutoLaunchChange} />
+                开机自动启动
+              </label>
+              <label className="flex items-center gap-2">
                 <input type="checkbox" checked={config.showMainWindowOnStartup} onChange={onShowOnStartupChange} />
                 启动时显示主界面
               </label>
-            </div>
-            <div className="mt-3 space-y-2 rounded border bg-white p-2">
-              <div className="text-[13px] font-semibold text-slate-700">数据存储路径</div>
-              <div className="text-[12px] text-slate-500 break-all">当前: {storagePath || "-"}</div>
-              <div className="flex items-center gap-2">
-                <input
-                  value={draftStoragePath}
-                  onChange={onDraftStoragePathChange}
-                  disabled={storageLockedByEnv || applyingStoragePath}
-                  placeholder="选择或输入目录路径"
-                  className="h-9 flex-1 rounded border px-2 text-[13px] outline-none focus:border-blue-500 disabled:bg-slate-100"
-                />
-                <button
-                  onClick={onPickStoragePath}
-                  disabled={storageLockedByEnv || applyingStoragePath}
-                  className="h-9 rounded border px-3 text-[12px] disabled:opacity-50"
-                >
-                  浏览
-                </button>
-                <button
-                  onClick={onApplyStoragePath}
-                  disabled={storageLockedByEnv || applyingStoragePath}
-                  className="h-9 rounded border border-blue-500 px-3 text-[12px] text-blue-600 disabled:opacity-50"
-                >
-                  {applyingStoragePath ? "应用中..." : "应用路径"}
-                </button>
-              </div>
-              {storageLockedByEnv ? (
-                <div className="text-[12px] text-amber-600">已检测到 GOTIFY_DATA_DIR，界面路径修改已锁定</div>
-              ) : (
-                <div className="text-[12px] text-slate-400">修改后会迁移缓存文件，重启应用后生效</div>
-              )}
             </div>
           </div>
         </div>
@@ -272,7 +332,7 @@ function SettingsModal({
   );
 }
 
-function MessageCard({ item, appLabel }: { item: MessageItem; appLabel?: string }) {
+function MessageCard({ item, appLabel, onToggleFavorite }: { item: MessageItem; appLabel?: string; onToggleFavorite: (id: number) => void }) {
   const [expanded, setExpanded] = useState(false);
   const priorityColor = item.priority >= 8 ? "bg-red-500" : item.priority >= 4 ? "bg-blue-500" : "bg-green-500";
   const rawMessage = String(item.message || "");
@@ -296,7 +356,32 @@ function MessageCard({ item, appLabel }: { item: MessageItem; appLabel?: string 
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="truncate text-[20px] font-bold text-slate-800">{item.title || "无标题"}</div>
-          <div className="whitespace-nowrap text-[14px] text-slate-400">{formatDate(item.date)}</div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => item.id && onToggleFavorite(item.id)}
+              className="text-slate-400 hover:text-amber-400 focus:outline-none"
+              title={item.favorite ? "取消收藏" : "收藏"}
+            >
+              {item.favorite ? (
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5 text-amber-400">
+                  <path
+                    fillRule="evenodd"
+                    d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.563.044.793.745.362 1.116l-4.208 3.527a.562.562 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.208-3.527c-.433-.371-.202-1.072.362-1.116l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+                  />
+                </svg>
+              )}
+            </button>
+            <div className="whitespace-nowrap text-[14px] text-slate-400">{formatDate(item.date)}</div>
+          </div>
         </div>
         <div className="mt-1 text-[14px] text-slate-500">{appLabel || `应用 #${item.appid || 0}`}</div>
         <div className="mt-1 text-[16px] text-slate-700 whitespace-pre-wrap break-words">{visibleMessage}</div>
@@ -327,6 +412,8 @@ function App() {
   const [storageLockedByEnv, setStorageLockedByEnv] = useState(false);
   const [applications, setApplications] = useState<ApplicationInfo[]>([]);
   const [selectedAppId, setSelectedAppId] = useState("all");
+  const [searchText, setSearchText] = useState("");
+  const [showFavorites, setShowFavorites] = useState(false);
 
   useEffect(() => {
     let unsubStatus = null;
@@ -489,6 +576,22 @@ function App() {
     }
   };
 
+  const onToggleFavorite = async (id: number) => {
+    try {
+      const newStatus = await window.gotifyAPI.toggleFavorite(id);
+      setMessages((prev) =>
+        prev.map((msg) => {
+          if (msg.id === id) {
+            return { ...msg, favorite: newStatus };
+          }
+          return msg;
+        })
+      );
+    } catch (error) {
+      setBanner("操作失败，请重试");
+    }
+  };
+
   const appIdSet = useMemo(() => new Set(messages.map((item) => Number(item.appid || 0)).filter((id) => id > 0)), [messages]);
   const applicationOptions = useMemo(() => {
     const knownIds = new Set(applications.map((item) => item.id));
@@ -503,7 +606,24 @@ function App() {
     const matched = applications.find((item) => item.id === id);
     return matched?.name || `应用 #${id}`;
   };
-  const visibleMessages = selectedAppId === "all" ? messages : messages.filter((item) => String(item.appid) === selectedAppId);
+  const visibleMessages = useMemo(() => {
+    let result = messages;
+    if (showFavorites) {
+      result = result.filter((item) => item.favorite);
+    }
+    if (selectedAppId !== "all") {
+      result = result.filter((item) => String(item.appid) === selectedAppId);
+    }
+    const keyword = searchText.trim().toLowerCase();
+    if (keyword) {
+      result = result.filter(
+        (item) =>
+          (item.title && item.title.toLowerCase().includes(keyword)) ||
+          (item.message && item.message.toLowerCase().includes(keyword))
+      );
+    }
+    return result;
+  }, [messages, selectedAppId, searchText, showFavorites]);
 
   if (loading) {
     return (
@@ -516,8 +636,40 @@ function App() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between bg-white px-3 py-2 shadow-sm">
-        <div className="text-[16px] font-bold text-slate-700">历史消息</div>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowFavorites(false)}
+            className={`text-[16px] font-bold ${!showFavorites ? "text-slate-700" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            历史消息
+          </button>
+          <button
+            onClick={() => setShowFavorites(true)}
+            className={`text-[16px] font-bold ${showFavorites ? "text-slate-700" : "text-slate-400 hover:text-slate-600"}`}
+          >
+            我的收藏
+          </button>
+        </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <input
+              value={searchText}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setSearchText(event.target.value)}
+              placeholder="搜索消息..."
+              className="h-8 w-40 rounded border border-slate-200 bg-white pl-2 pr-7 text-[12px] text-slate-600 outline-none focus:border-blue-500"
+            />
+            {searchText ? (
+              <button onClick={() => setSearchText("")} className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            ) : null}
+          </div>
           <select
             value={selectedAppId}
             onChange={(event: ChangeEvent<HTMLSelectElement>) => setSelectedAppId(event.target.value)}
@@ -538,7 +690,14 @@ function App() {
           {visibleMessages.length === 0 ? (
             <div className="flex h-full items-center justify-center text-slate-400">暂无消息</div>
           ) : (
-            visibleMessages.map((item) => <MessageCard key={`${item.id}-${item.date}`} item={item} appLabel={getAppLabel(item.appid)} />)
+            visibleMessages.map((item) => (
+              <MessageCard
+                key={`${item.id}-${item.date}`}
+                item={item}
+                appLabel={getAppLabel(item.appid)}
+                onToggleFavorite={onToggleFavorite}
+              />
+            ))
           )}
         </div>
         <div className="mt-3 flex items-center justify-between">

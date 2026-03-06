@@ -52,12 +52,21 @@ function resolveStorageDir() {
   if (envPath) {
     candidates.push(envPath);
   }
-  const preferredPath = readPreferredDir();
-  if (preferredPath) {
-    candidates.push(preferredPath);
-  }
   if (app.isPackaged) {
-    candidates.push(path.dirname(process.execPath));
+    // Check if we have a preferred path stored in userData
+    const preferredPath = readPreferredDir();
+    if (preferredPath) {
+      candidates.push(preferredPath);
+    }
+    
+    // Portable mode check: if config.json exists in exe dir, prioritize it
+    const exeDir = path.dirname(process.execPath);
+    if (fs.existsSync(path.join(exeDir, "config.json"))) {
+      candidates.push(exeDir);
+    }
+
+    // Default to userData for persistence across updates
+    candidates.push(app.getPath("userData"));
   } else {
     candidates.push(__dirname);
   }
@@ -165,7 +174,12 @@ async function refreshApplications(config, force = false) {
   const normalized = serverUrl.replace(/\/+$/, "");
   const url = `${normalized}/application?token=${encodeURIComponent(clientToken)}`;
   try {
-    const response = await fetch(url, { method: "GET" });
+    const response = await fetch(url, { 
+      method: "GET",
+      headers: {
+        "X-Gotify-Key": clientToken
+      }
+    });
     if (!response.ok) {
       return applicationList;
     }
@@ -438,17 +452,65 @@ function formatNotificationBody(rawText) {
   return merged.length > 200 ? `${merged.slice(0, 200)}...` : merged;
 }
 
+async function forwardToBark(message, config) {
+  const barkUrl = config.barkServerUrl;
+  if (!barkUrl) return;
+
+  const appid = Number(message.appid || 0);
+  const allowedApps = Array.isArray(config.barkForwardApps) ? config.barkForwardApps : [];
+  
+  // Check if forwarding is enabled for this app (if list is not empty)
+  // If list is empty, we assume NO forwarding by default (user must select apps)
+  if (allowedApps.length > 0 && !allowedApps.includes(appid)) {
+    return;
+  }
+  if (allowedApps.length === 0) {
+    return;
+  }
+
+  const title = encodeURIComponent(message.title || "Gotify 消息");
+  const body = encodeURIComponent(message.message || "");
+  const group = encodeURIComponent(message.appname || "Gotify");
+  // Simple Bark URL format: server/push_key/title/body?group=xxx
+  // Assuming user provides full URL like https://api.day.app/KEY/
+  
+  let target = barkUrl.replace(/\/+$/, "");
+  // If user pasted full url with key, append content
+  // If user pasted just server, we can't do much without key. 
+  // Let's assume user provides "https://api.day.app/YOUR_KEY"
+  
+  const url = `${target}/${title}/${body}?group=${group}`;
+  
+  try {
+    await fetch(url, { method: "GET" });
+  } catch (e) {
+    console.error("Bark forwarding failed:", e);
+  }
+}
+
 function bindGotifyEvents() {
   gotifyClient.on("status", (payload) => {
     currentConnectionStatus = payload;
     mainWindow?.webContents.send("connection-status", payload);
   });
-  gotifyClient.on("message", (message) => {
-    const appName = getAppNameById(message.appid);
+  gotifyClient.on("message", async (message) => {
+    // Refresh apps if we see a new appid or if app name is missing
+    const appid = Number(message.appid || 0);
+    let appName = getAppNameById(appid);
+    
+    if (appid && !appName) {
+      await refreshApplications(configStore.get(), true);
+      appName = getAppNameById(appid);
+    }
+    
     const enriched = appName ? { ...message, appname: appName } : message;
     historyStore.add(enriched);
     mainWindow?.webContents.send("new-message", enriched);
     const config = configStore.get();
+    
+    // Bark Forwarding
+    forwardToBark(enriched, config);
+
     if (config.showCustomNotification) {
       showCustomNotification(enriched, config);
     } else {
@@ -482,6 +544,17 @@ function setupIpc() {
   ipcMain.handle("config:get", () => configStore.get());
   ipcMain.handle("config:save", async (_, nextConfig) => {
     const saved = configStore.save(nextConfig);
+    
+    // Handle auto-launch
+    const loginSettings = app.getLoginItemSettings();
+    if (loginSettings.openAtLogin !== saved.autoLaunch) {
+      app.setLoginItemSettings({
+        openAtLogin: saved.autoLaunch,
+        path: process.execPath,
+        args: []
+      });
+    }
+
     gotifyClient.stop();
     if (saved.serverUrl && saved.clientToken) {
       gotifyClient.start(saved);
@@ -498,6 +571,9 @@ function setupIpc() {
     } catch (error) {
       return false;
     }
+  });
+  ipcMain.handle("messages:toggleFavorite", (_, id) => {
+    return historyStore.toggleFavorite(id);
   });
   ipcMain.handle("connection:test", async (_, payload) => {
     await testConnection(payload.serverUrl, payload.clientToken);
@@ -522,6 +598,11 @@ function setupIpc() {
     path: storageDirPath,
     lockedByEnv: Boolean(String(process.env.GOTIFY_DATA_DIR || "").trim())
   }));
+  ipcMain.handle("storage:open", () => {
+    if (storageDirPath) {
+      require("electron").shell.openPath(storageDirPath);
+    }
+  });
   ipcMain.handle("storage:pickPath", async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ["openDirectory", "createDirectory"]

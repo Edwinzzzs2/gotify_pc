@@ -46,6 +46,17 @@ class HistoryStore {
     this.persist();
   }
 
+  toggleFavorite(id) {
+    const targetId = Number(id);
+    const message = this.messages.find((m) => Number(m.id) === targetId);
+    if (message) {
+      message.favorite = !message.favorite;
+      this.persist();
+      return message.favorite;
+    }
+    return false;
+  }
+
   persist() {
     try {
       fs.writeFileSync(this.historyPath, JSON.stringify(this.messages, null, 2), "utf8");

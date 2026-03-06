@@ -4,7 +4,7 @@
   "description": "Gotify PC client based on Electron",
   "main": "main.js",
   "scripts": {
-    "start": "npm run build:assets && electron .",
+    "start": "npm run build:assets && npm run prepare:icon && node scripts/patch-electron-icon.js && electron .",
     "lint": "node --check main.js && node --check preload.js && node --check src/services/config-store.js && node --check src/services/history-store.js && node --check src/services/gotify-client.js",
     "prepare:icon": "node scripts/prepare-icon.js",
     "build:css": "npx tailwindcss -i src/tailwind.css -o assets/tailwind.css --minify",
@@ -67,6 +67,7 @@
       ]
     },
     "nsis": {
+      "include": "scripts/installer.nsh",
       "installerIcon": "build/defaultapp.ico",
       "uninstallerIcon": "build/defaultapp.ico",
       "installerHeaderIcon": "build/defaultapp.ico",

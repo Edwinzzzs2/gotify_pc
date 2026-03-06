@@ -24499,8 +24499,11 @@ var DEFAULT_CONFIG = {
   notificationDuration: 5e3,
   minimizeToTray: true,
   showMainWindowOnStartup: true,
+  autoLaunch: false,
   enableReconnect: true,
-  autoRefreshInterval: 1e4
+  autoRefreshInterval: 1e4,
+  barkServerUrl: "",
+  barkForwardApps: []
 };
 function formatDate(value) {
   const date = new Date(value);
@@ -24528,6 +24531,14 @@ function SettingsModal({
   storageLockedByEnv
 }) {
   const [showToken, setShowToken] = (0, import_react.useState)(false);
+  const [applications, setApplications] = (0, import_react.useState)([]);
+  (0, import_react.useEffect)(() => {
+    if (open) {
+      window.gotifyAPI.getApplications().then((apps) => {
+        setApplications(Array.isArray(apps) ? apps : []);
+      });
+    }
+  }, [open]);
   const onServerUrlChange = (event) => {
     setConfig((prev) => ({ ...prev, serverUrl: event.target.value }));
   };
@@ -24560,8 +24571,29 @@ function SettingsModal({
   const onShowOnStartupChange = (event) => {
     setConfig((prev) => ({ ...prev, showMainWindowOnStartup: event.target.checked }));
   };
+  const onAutoLaunchChange = (event) => {
+    setConfig((prev) => ({ ...prev, autoLaunch: event.target.checked }));
+  };
+  const onBarkUrlChange = (event) => {
+    setConfig((prev) => ({ ...prev, barkServerUrl: event.target.value }));
+  };
+  const onBarkAppToggle = (id) => {
+    setConfig((prev) => {
+      const current = Array.isArray(prev.barkForwardApps) ? prev.barkForwardApps : [];
+      if (current.includes(id)) {
+        return { ...prev, barkForwardApps: current.filter((x) => x !== id) };
+      }
+      return { ...prev, barkForwardApps: [...current, id] };
+    });
+  };
   const onDraftStoragePathChange = (event) => {
     setDraftStoragePath(event.target.value);
+  };
+  const onOpenStoragePath = async () => {
+    try {
+      await window.gotifyAPI.openStoragePath();
+    } catch (e) {
+    }
   };
   if (!open) {
     return null;
@@ -24639,6 +24671,55 @@ function SettingsModal({
           ] })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded border bg-slate-50 p-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mb-2 text-[15px] font-bold", children: "Bark \u6D88\u606F\u8F6C\u53D1" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[13px] text-slate-600", children: "\u5C06\u6536\u5230\u7684\u6D88\u606F\u8F6C\u53D1\u5230 iOS Bark App" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+              "input",
+              {
+                value: config.barkServerUrl || "",
+                onChange: onBarkUrlChange,
+                placeholder: "https://api.day.app/YOUR_KEY",
+                className: "h-9 w-full rounded border px-2 text-[13px] outline-none focus:border-blue-500"
+              }
+            ),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[12px] font-semibold text-slate-600", children: "\u9009\u62E9\u8981\u8F6C\u53D1\u7684\u5E94\u7528\u5206\u7EC4:" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "max-h-24 overflow-y-auto rounded border bg-white p-2", children: applications.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[12px] text-slate-400", children: "\u6682\u65E0\u5E94\u7528\u5206\u7EC4\uFF0C\u8BF7\u5148\u8FDE\u63A5\u670D\u52A1\u5668" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid grid-cols-2 gap-2", children: applications.map((app) => {
+              var _a;
+              return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "flex items-center gap-2 text-[12px] text-slate-700", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "input",
+                  {
+                    type: "checkbox",
+                    checked: (_a = config.barkForwardApps) == null ? void 0 : _a.includes(app.id),
+                    onChange: () => onBarkAppToggle(app.id)
+                  }
+                ),
+                app.name
+              ] }, app.id);
+            }) }) })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded border bg-slate-50 p-3", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mb-2 text-[15px] font-bold", children: "\u6570\u636E\u5B58\u50A8" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-2", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[13px] text-slate-600", children: "\u5F53\u524D\u6570\u636E\u5B58\u50A8\u8DEF\u5F84" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex-1 rounded border bg-white px-2 py-1.5 text-[12px] text-slate-600 break-all", children: storagePath || "-" }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "button",
+                {
+                  onClick: onOpenStoragePath,
+                  disabled: !storagePath,
+                  className: "h-8 whitespace-nowrap rounded border border-blue-500 px-3 text-[12px] text-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:hover:bg-transparent",
+                  children: "\u6253\u5F00\u76EE\u5F55"
+                }
+              )
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[12px] text-slate-400", children: "\u5982\u9700\u8FC1\u79FB\u6570\u636E\uFF0C\u8BF7\u624B\u52A8\u590D\u5236\u6587\u4EF6\u5230\u65B0\u76EE\u5F55" })
+          ] })
+        ] }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded border bg-slate-50 p-3", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mb-2 text-[15px] font-bold", children: "\u5176\u4ED6\u8BBE\u7F6E" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "space-y-1.5 text-[14px]", children: [
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "flex items-center gap-2", children: [
@@ -24646,47 +24727,13 @@ function SettingsModal({
               "\u6700\u5C0F\u5316\u5230\u7CFB\u7EDF\u6258\u76D8"
             ] }),
             /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "flex items-center gap-2", children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: config.autoLaunch, onChange: onAutoLaunchChange }),
+              "\u5F00\u673A\u81EA\u52A8\u542F\u52A8"
+            ] }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "flex items-center gap-2", children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: config.showMainWindowOnStartup, onChange: onShowOnStartupChange }),
               "\u542F\u52A8\u65F6\u663E\u793A\u4E3B\u754C\u9762"
             ] })
-          ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-3 space-y-2 rounded border bg-white p-2", children: [
-            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[13px] font-semibold text-slate-700", children: "\u6570\u636E\u5B58\u50A8\u8DEF\u5F84" }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "text-[12px] text-slate-500 break-all", children: [
-              "\u5F53\u524D: ",
-              storagePath || "-"
-            ] }),
-            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2", children: [
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "input",
-                {
-                  value: draftStoragePath,
-                  onChange: onDraftStoragePathChange,
-                  disabled: storageLockedByEnv || applyingStoragePath,
-                  placeholder: "\u9009\u62E9\u6216\u8F93\u5165\u76EE\u5F55\u8DEF\u5F84",
-                  className: "h-9 flex-1 rounded border px-2 text-[13px] outline-none focus:border-blue-500 disabled:bg-slate-100"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "button",
-                {
-                  onClick: onPickStoragePath,
-                  disabled: storageLockedByEnv || applyingStoragePath,
-                  className: "h-9 rounded border px-3 text-[12px] disabled:opacity-50",
-                  children: "\u6D4F\u89C8"
-                }
-              ),
-              /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-                "button",
-                {
-                  onClick: onApplyStoragePath,
-                  disabled: storageLockedByEnv || applyingStoragePath,
-                  className: "h-9 rounded border border-blue-500 px-3 text-[12px] text-blue-600 disabled:opacity-50",
-                  children: applyingStoragePath ? "\u5E94\u7528\u4E2D..." : "\u5E94\u7528\u8DEF\u5F84"
-                }
-              )
-            ] }),
-            storageLockedByEnv ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[12px] text-amber-600", children: "\u5DF2\u68C0\u6D4B\u5230 GOTIFY_DATA_DIR\uFF0C\u754C\u9762\u8DEF\u5F84\u4FEE\u6539\u5DF2\u9501\u5B9A" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[12px] text-slate-400", children: "\u4FEE\u6539\u540E\u4F1A\u8FC1\u79FB\u7F13\u5B58\u6587\u4EF6\uFF0C\u91CD\u542F\u5E94\u7528\u540E\u751F\u6548" })
           ] })
         ] })
       ] }),
@@ -24701,7 +24748,7 @@ function SettingsModal({
     ] })
   ] });
 }
-function MessageCard({ item, appLabel }) {
+function MessageCard({ item, appLabel, onToggleFavorite }) {
   const [expanded, setExpanded] = (0, import_react.useState)(false);
   const priorityColor = item.priority >= 8 ? "bg-red-500" : item.priority >= 4 ? "bg-blue-500" : "bg-green-500";
   const rawMessage = String(item.message || "");
@@ -24724,7 +24771,32 @@ function MessageCard({ item, appLabel }) {
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "min-w-0 flex-1", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-start justify-between gap-2", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "truncate text-[20px] font-bold text-slate-800", children: item.title || "\u65E0\u6807\u9898" }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "whitespace-nowrap text-[14px] text-slate-400", children: formatDate(item.date) })
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              onClick: () => item.id && onToggleFavorite(item.id),
+              className: "text-slate-400 hover:text-amber-400 focus:outline-none",
+              title: item.favorite ? "\u53D6\u6D88\u6536\u85CF" : "\u6536\u85CF",
+              children: item.favorite ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 24 24", fill: "currentColor", className: "h-5 w-5 text-amber-400", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "path",
+                {
+                  fillRule: "evenodd",
+                  d: "M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z",
+                  clipRule: "evenodd"
+                }
+              ) }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { xmlns: "http://www.w3.org/2000/svg", fill: "none", viewBox: "0 0 24 24", strokeWidth: 1.5, stroke: "currentColor", className: "h-5 w-5", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                "path",
+                {
+                  strokeLinecap: "round",
+                  strokeLinejoin: "round",
+                  d: "M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.563.044.793.745.362 1.116l-4.208 3.527a.562.562 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.208-3.527c-.433-.371-.202-1.072.362-1.116l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+                }
+              ) })
+            }
+          ),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "whitespace-nowrap text-[14px] text-slate-400", children: formatDate(item.date) })
+        ] })
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-1 text-[14px] text-slate-500", children: appLabel || `\u5E94\u7528 #${item.appid || 0}` }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-1 text-[16px] text-slate-700 whitespace-pre-wrap break-words", children: visibleMessage }),
@@ -24749,6 +24821,8 @@ function App() {
   const [storageLockedByEnv, setStorageLockedByEnv] = (0, import_react.useState)(false);
   const [applications, setApplications] = (0, import_react.useState)([]);
   const [selectedAppId, setSelectedAppId] = (0, import_react.useState)("all");
+  const [searchText, setSearchText] = (0, import_react.useState)("");
+  const [showFavorites, setShowFavorites] = (0, import_react.useState)(false);
   (0, import_react.useEffect)(() => {
     let unsubStatus = null;
     let unsubMessage = null;
@@ -24895,6 +24969,21 @@ function App() {
       setApplyingStoragePath(false);
     }
   };
+  const onToggleFavorite = async (id) => {
+    try {
+      const newStatus = await window.gotifyAPI.toggleFavorite(id);
+      setMessages(
+        (prev) => prev.map((msg) => {
+          if (msg.id === id) {
+            return { ...msg, favorite: newStatus };
+          }
+          return msg;
+        })
+      );
+    } catch (error) {
+      setBanner("\u64CD\u4F5C\u5931\u8D25\uFF0C\u8BF7\u91CD\u8BD5");
+    }
+  };
   const appIdSet = (0, import_react.useMemo)(() => new Set(messages.map((item) => Number(item.appid || 0)).filter((id) => id > 0)), [messages]);
   const applicationOptions = (0, import_react.useMemo)(() => {
     const knownIds = new Set(applications.map((item) => item.id));
@@ -24907,14 +24996,65 @@ function App() {
     const matched = applications.find((item) => item.id === id);
     return (matched == null ? void 0 : matched.name) || `\u5E94\u7528 #${id}`;
   };
-  const visibleMessages = selectedAppId === "all" ? messages : messages.filter((item) => String(item.appid) === selectedAppId);
+  const visibleMessages = (0, import_react.useMemo)(() => {
+    let result = messages;
+    if (showFavorites) {
+      result = result.filter((item) => item.favorite);
+    }
+    if (selectedAppId !== "all") {
+      result = result.filter((item) => String(item.appid) === selectedAppId);
+    }
+    const keyword = searchText.trim().toLowerCase();
+    if (keyword) {
+      result = result.filter(
+        (item) => item.title && item.title.toLowerCase().includes(keyword) || item.message && item.message.toLowerCase().includes(keyword)
+      );
+    }
+    return result;
+  }, [messages, selectedAppId, searchText, showFavorites]);
   if (loading) {
     return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex h-full items-center justify-center text-slate-500", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[20px]", children: "\u52A0\u8F7D\u4E2D..." }) });
   }
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex h-full flex-col", children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center justify-between bg-white px-3 py-2 shadow-sm", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[16px] font-bold text-slate-700", children: "\u5386\u53F2\u6D88\u606F" }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-4", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            onClick: () => setShowFavorites(false),
+            className: `text-[16px] font-bold ${!showFavorites ? "text-slate-700" : "text-slate-400 hover:text-slate-600"}`,
+            children: "\u5386\u53F2\u6D88\u606F"
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            onClick: () => setShowFavorites(true),
+            className: `text-[16px] font-bold ${showFavorites ? "text-slate-700" : "text-slate-400 hover:text-slate-600"}`,
+            children: "\u6211\u7684\u6536\u85CF"
+          }
+        )
+      ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-3", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "relative", children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "input",
+            {
+              value: searchText,
+              onChange: (event) => setSearchText(event.target.value),
+              placeholder: "\u641C\u7D22\u6D88\u606F...",
+              className: "h-8 w-40 rounded border border-slate-200 bg-white pl-2 pr-7 text-[12px] text-slate-600 outline-none focus:border-blue-500"
+            }
+          ),
+          searchText ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { onClick: () => setSearchText(""), className: "absolute right-1 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 20 20", fill: "currentColor", className: "h-4 w-4", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "path",
+            {
+              fillRule: "evenodd",
+              d: "M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z",
+              clipRule: "evenodd"
+            }
+          ) }) }) : null
+        ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "select",
           {
@@ -24932,7 +25072,15 @@ function App() {
     ] }),
     banner ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "bg-blue-50 px-3 py-2 text-[14px] text-blue-700", children: banner }) : null,
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex min-h-0 flex-1 flex-col p-3 pt-0", children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "scroll-thin min-h-0 flex-1 overflow-y-auto rounded border bg-white", children: visibleMessages.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex h-full items-center justify-center text-slate-400", children: "\u6682\u65E0\u6D88\u606F" }) : visibleMessages.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MessageCard, { item, appLabel: getAppLabel(item.appid) }, `${item.id}-${item.date}`)) }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "scroll-thin min-h-0 flex-1 overflow-y-auto rounded border bg-white", children: visibleMessages.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "flex h-full items-center justify-center text-slate-400", children: "\u6682\u65E0\u6D88\u606F" }) : visibleMessages.map((item) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        MessageCard,
+        {
+          item,
+          appLabel: getAppLabel(item.appid),
+          onToggleFavorite
+        },
+        `${item.id}-${item.date}`
+      )) }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-3 flex items-center justify-between", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "flex items-center gap-2", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: `h-2 w-2 rounded-full ring-2 ${dotColor}` }),

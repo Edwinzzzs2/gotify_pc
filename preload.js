@@ -5,11 +5,13 @@ contextBridge.exposeInMainWorld("gotifyAPI", {
   saveConfig: (config) => ipcRenderer.invoke("config:save", config),
   getMessages: () => ipcRenderer.invoke("messages:get"),
   clearMessages: () => ipcRenderer.invoke("messages:clear"),
+  toggleFavorite: (id) => ipcRenderer.invoke("messages:toggleFavorite", id),
   getApplications: () => ipcRenderer.invoke("applications:get"),
   testConnection: (payload) => ipcRenderer.invoke("connection:test", payload),
   toggleConnection: () => ipcRenderer.invoke("connection:toggle"),
   getConnectionStatus: () => ipcRenderer.invoke("connection:getStatus"),
   getStoragePath: () => ipcRenderer.invoke("storage:getPath"),
+  openStoragePath: () => ipcRenderer.invoke("storage:open"),
   pickStoragePath: () => ipcRenderer.invoke("storage:pickPath"),
   setStoragePath: (nextPath) => ipcRenderer.invoke("storage:setPath", nextPath),
   onConnectionStatus: (callback) => {

@@ -11,8 +11,11 @@ const DEFAULT_CONFIG = {
   notificationDuration: 5000,
   minimizeToTray: true,
   showMainWindowOnStartup: true,
+  autoLaunch: false,
   enableReconnect: true,
-  autoRefreshInterval: 10000
+  autoRefreshInterval: 10000,
+  barkServerUrl: "",
+  barkForwardApps: [] // Array of app IDs to forward, empty means none (or all? let's make it explicit selection)
 };
 
 class ConfigStore {
