@@ -24503,7 +24503,8 @@ var DEFAULT_CONFIG = {
   enableReconnect: true,
   autoRefreshInterval: 1e4,
   barkServerUrl: "",
-  barkForwardApps: []
+  barkForwardApps: [],
+  mutedNotificationApps: []
 };
 function formatDate(value) {
   const date = new Date(value);
@@ -24516,6 +24517,7 @@ function SettingsModal({
   open,
   onClose,
   config,
+  appVersion,
   setConfig,
   onSave,
   onTest,
@@ -24576,6 +24578,15 @@ function SettingsModal({
   };
   const onBarkUrlChange = (event) => {
     setConfig((prev) => ({ ...prev, barkServerUrl: event.target.value }));
+  };
+  const onMutedNotificationAppToggle = (id) => {
+    setConfig((prev) => {
+      const current = Array.isArray(prev.mutedNotificationApps) ? prev.mutedNotificationApps : [];
+      if (current.includes(id)) {
+        return { ...prev, mutedNotificationApps: current.filter((x) => x !== id) };
+      }
+      return { ...prev, mutedNotificationApps: [...current, id] };
+    });
   };
   const onBarkAppToggle = (id) => {
     setConfig((prev) => {
@@ -24668,6 +24679,24 @@ function SettingsModal({
               }
             ),
             /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-slate-500 whitespace-nowrap", children: "(\u4EC5\u5728\u81EA\u52A8\u6D88\u5931\u542F\u7528\u65F6)" })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-3", children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mb-1 text-[12px] font-semibold text-slate-600", children: "\u5C4F\u853D\u5F39\u7A97\u5206\u7EC4:" }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "max-h-24 overflow-y-auto rounded border bg-white p-2", children: applications.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "text-[12px] text-slate-400", children: "\u6682\u65E0\u5E94\u7528\u5206\u7EC4\uFF0C\u8BF7\u5148\u8FDE\u63A5\u670D\u52A1\u5668" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "grid grid-cols-2 gap-2", children: applications.map((app) => {
+              var _a;
+              return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("label", { className: "flex items-center gap-2 text-[12px] text-slate-700", children: [
+                /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+                  "input",
+                  {
+                    type: "checkbox",
+                    checked: (_a = config.mutedNotificationApps) == null ? void 0 : _a.includes(app.id),
+                    onChange: () => onMutedNotificationAppToggle(app.id)
+                  }
+                ),
+                app.name
+              ] }, app.id);
+            }) }) }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "mt-1 text-[12px] text-slate-400", children: "\u9009\u4E2D\u7684\u5206\u7EC4\u5C06\u4E0D\u518D\u663E\u793A\u5F39\u7A97\u63D0\u9192" })
           ] })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "rounded border bg-slate-50 p-3", children: [
@@ -24734,6 +24763,10 @@ function SettingsModal({
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { type: "checkbox", checked: config.showMainWindowOnStartup, onChange: onShowOnStartupChange }),
               "\u542F\u52A8\u65F6\u663E\u793A\u4E3B\u754C\u9762"
             ] })
+          ] }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "mt-3 border-t border-slate-200 pt-2 text-[13px] text-slate-500", children: [
+            "\u7248\u672C\u53F7: ",
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "font-mono text-slate-700", children: appVersion || "-" })
           ] })
         ] })
       ] }),
@@ -24806,6 +24839,7 @@ function MessageCard({ item, appLabel, onToggleFavorite }) {
 }
 function App() {
   const [config, setConfig] = (0, import_react.useState)({ ...DEFAULT_CONFIG });
+  const [appVersion, setAppVersion] = (0, import_react.useState)("-");
   const [messages, setMessages] = (0, import_react.useState)([]);
   const [status, setStatus] = (0, import_react.useState)({ connected: false, status: "\u672A\u8FDE\u63A5" });
   const [settingsOpen, setSettingsOpen] = (0, import_react.useState)(false);
@@ -24830,12 +24864,14 @@ function App() {
     let unsubMessagesCleared = null;
     const run = async () => {
       try {
-        const [cfg, history, storageMeta, apps] = await Promise.all([
+        const [cfg, history, storageMeta, apps, version] = await Promise.all([
           window.gotifyAPI.getConfig(),
           window.gotifyAPI.getMessages(),
           window.gotifyAPI.getStoragePath(),
-          window.gotifyAPI.getApplications()
+          window.gotifyAPI.getApplications(),
+          window.gotifyAPI.getAppVersion()
         ]);
+        setAppVersion(String(version || "-"));
         setConfig({ ...DEFAULT_CONFIG, ...cfg });
         setMessages(Array.isArray(history) ? history : []);
         const nextStoragePath = String((storageMeta == null ? void 0 : storageMeta.path) || "");
@@ -25107,6 +25143,7 @@ function App() {
         open: settingsOpen,
         onClose: () => setSettingsOpen(false),
         config,
+        appVersion,
         setConfig,
         onSave,
         onTest,

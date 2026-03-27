@@ -15,7 +15,8 @@ const DEFAULT_CONFIG = {
   enableReconnect: true,
   autoRefreshInterval: 10000,
   barkServerUrl: "",
-  barkForwardApps: [] // Array of app IDs to forward, empty means none (or all? let's make it explicit selection)
+  barkForwardApps: [], // Array of app IDs to forward, empty means none (or all? let's make it explicit selection)
+  mutedNotificationApps: [] // Array of app IDs to mute popup notifications
 };
 
 class ConfigStore {

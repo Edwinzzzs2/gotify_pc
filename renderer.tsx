@@ -17,6 +17,7 @@ const DEFAULT_CONFIG = {
   autoRefreshInterval: 10000,
   barkServerUrl: "",
   barkForwardApps: [] as number[],
+  mutedNotificationApps: [] as number[],
 };
 
 type Config = typeof DEFAULT_CONFIG;
@@ -38,6 +39,7 @@ type SettingsModalProps = {
   open: boolean;
   onClose: () => void;
   config: Config;
+  appVersion: string;
   setConfig: Dispatch<SetStateAction<Config>>;
   onSave: () => void;
   onTest: () => void;
@@ -53,6 +55,7 @@ type SettingsModalProps = {
   storageLockedByEnv: boolean;
 };
 type GotifyAPI = {
+  getAppVersion: () => Promise<string>;
   getConfig: () => Promise<Partial<Config>>;
   saveConfig: (config: Config) => Promise<Config>;
   testConnection: (payload: { serverUrl: string; clientToken: string }) => Promise<void>;
@@ -90,6 +93,7 @@ function SettingsModal({
   open,
   onClose,
   config,
+  appVersion,
   setConfig,
   onSave,
   onTest,
@@ -152,6 +156,15 @@ function SettingsModal({
   };
   const onBarkUrlChange = (event: ChangeEvent<HTMLInputElement>) => {
     setConfig((prev) => ({ ...prev, barkServerUrl: event.target.value }));
+  };
+  const onMutedNotificationAppToggle = (id: number) => {
+    setConfig((prev) => {
+      const current = Array.isArray(prev.mutedNotificationApps) ? prev.mutedNotificationApps : [];
+      if (current.includes(id)) {
+        return { ...prev, mutedNotificationApps: current.filter((x) => x !== id) };
+      }
+      return { ...prev, mutedNotificationApps: [...current, id] };
+    });
   };
   const onBarkAppToggle = (id: number) => {
     setConfig((prev) => {
@@ -242,6 +255,28 @@ function SettingsModal({
               />
               <div className="text-slate-500 whitespace-nowrap">(仅在自动消失启用时)</div>
             </div>
+            <div className="mt-3">
+              <div className="mb-1 text-[12px] font-semibold text-slate-600">屏蔽弹窗分组:</div>
+              <div className="max-h-24 overflow-y-auto rounded border bg-white p-2">
+                {applications.length === 0 ? (
+                  <div className="text-[12px] text-slate-400">暂无应用分组，请先连接服务器</div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    {applications.map((app) => (
+                      <label key={app.id} className="flex items-center gap-2 text-[12px] text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={config.mutedNotificationApps?.includes(app.id)}
+                          onChange={() => onMutedNotificationAppToggle(app.id)}
+                        />
+                        {app.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="mt-1 text-[12px] text-slate-400">选中的分组将不再显示弹窗提醒</div>
+            </div>
           </div>
           <div className="rounded border bg-slate-50 p-3">
             <div className="mb-2 text-[15px] font-bold">Bark 消息转发</div>
@@ -308,6 +343,9 @@ function SettingsModal({
                 <input type="checkbox" checked={config.showMainWindowOnStartup} onChange={onShowOnStartupChange} />
                 启动时显示主界面
               </label>
+            </div>
+            <div className="mt-3 border-t border-slate-200 pt-2 text-[13px] text-slate-500">
+              版本号: <span className="font-mono text-slate-700">{appVersion || "-"}</span>
             </div>
           </div>
         </div>
@@ -397,6 +435,7 @@ function MessageCard({ item, appLabel, onToggleFavorite }: { item: MessageItem; 
 
 function App() {
   const [config, setConfig] = useState<Config>({ ...DEFAULT_CONFIG });
+  const [appVersion, setAppVersion] = useState("-");
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [status, setStatus] = useState<ConnectionStatus>({ connected: false, status: "未连接" });
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -422,12 +461,14 @@ function App() {
     let unsubMessagesCleared = null;
     const run = async () => {
       try {
-        const [cfg, history, storageMeta, apps] = await Promise.all([
+        const [cfg, history, storageMeta, apps, version] = await Promise.all([
           window.gotifyAPI.getConfig(),
           window.gotifyAPI.getMessages(),
           window.gotifyAPI.getStoragePath(),
           window.gotifyAPI.getApplications(),
+          window.gotifyAPI.getAppVersion(),
         ]);
+        setAppVersion(String(version || "-"));
         setConfig({ ...DEFAULT_CONFIG, ...cfg });
         setMessages(Array.isArray(history) ? history : []);
         const nextStoragePath = String(storageMeta?.path || "");
@@ -726,6 +767,7 @@ function App() {
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
         config={config}
+        appVersion={appVersion}
         setConfig={setConfig}
         onSave={onSave}
         onTest={onTest}

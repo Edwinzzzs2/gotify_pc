@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("gotifyAPI", {
+  getAppVersion: () => ipcRenderer.invoke("app:getVersion"),
   getConfig: () => ipcRenderer.invoke("config:get"),
   saveConfig: (config) => ipcRenderer.invoke("config:save", config),
   getMessages: () => ipcRenderer.invoke("messages:get"),

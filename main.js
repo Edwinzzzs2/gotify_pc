@@ -452,6 +452,15 @@ function formatNotificationBody(rawText) {
   return merged.length > 200 ? `${merged.slice(0, 200)}...` : merged;
 }
 
+function isPopupMutedForApp(config, appid) {
+  const id = Number(appid || 0);
+  if (!id) {
+    return false;
+  }
+  const mutedApps = Array.isArray(config?.mutedNotificationApps) ? config.mutedNotificationApps : [];
+  return mutedApps.includes(id);
+}
+
 async function forwardToBark(message, config) {
   const barkUrl = config.barkServerUrl;
   if (!barkUrl) return;
@@ -511,6 +520,10 @@ function bindGotifyEvents() {
     // Bark Forwarding
     forwardToBark(enriched, config);
 
+    if (isPopupMutedForApp(config, enriched.appid)) {
+      return;
+    }
+
     if (config.showCustomNotification) {
       showCustomNotification(enriched, config);
     } else {
@@ -541,6 +554,7 @@ function bindGotifyEvents() {
 }
 
 function setupIpc() {
+  ipcMain.handle("app:getVersion", () => `v${app.getVersion()}`);
   ipcMain.handle("config:get", () => configStore.get());
   ipcMain.handle("config:save", async (_, nextConfig) => {
     const saved = configStore.save(nextConfig);
