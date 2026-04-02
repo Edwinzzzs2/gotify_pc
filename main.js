@@ -58,7 +58,7 @@ function resolveStorageDir() {
     if (preferredPath) {
       candidates.push(preferredPath);
     }
-    
+    const
     // Portable mode check: if config.json exists in exe dir, prioritize it
     const exeDir = path.dirname(process.execPath);
     if (fs.existsSync(path.join(exeDir, "config.json"))) {

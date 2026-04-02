@@ -3,12 +3,11 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 jobs:
   release:
     runs-on: windows-latest
-
     permissions:
       contents: write
 
@@ -20,42 +19,60 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: "https://registry.npmjs.org"
 
-      - name: Normalize lockfile registry
-        run: |
-          if (Test-Path "package-lock.json") {
-            $content = Get-Content -Path "package-lock.json" -Raw
-            $content = $content -replace 'https://packages\.aliyun\.com/5f9a23913a5188f27f3f344b/npm/npm-registry/', 'https://registry.npmjs.org/'
-            Set-Content -Path "package-lock.json" -Value $content -Encoding utf8
-          }
-        shell: powershell
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
 
-      - name: Install dependencies
+      - name: Cache Rust build artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: "./tauri-app/src-tauri -> target"
+
+      - name: Install frontend dependencies
+        working-directory: tauri-app
         run: npm install
 
-      - name: Update package version
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Sync tag version to project
+        shell: pwsh
         run: |
           $version = $env:GITHUB_REF_NAME.TrimStart('v')
+
+          Push-Location "tauri-app"
           npm version $version --no-git-tag-version
-        shell: powershell
+          Pop-Location
+
+          $cargoPath = "tauri-app/src-tauri/Cargo.toml"
+          $lines = Get-Content $cargoPath
+          $inPackage = $false
+          for ($i = 0; $i -lt $lines.Count; $i++) {
+            if ($lines[$i] -match '^\[package\]$') {
+              $inPackage = $true
+              continue
+            }
+            if ($inPackage -and $lines[$i] -match '^\[') {
+              break
+            }
+            if ($inPackage -and $lines[$i] -match '^version\s*=') {
+              $lines[$i] = "version = `"$version`""
+              break
+            }
+          }
+          Set-Content -Path $cargoPath -Value $lines -Encoding utf8
 
       - name: Build Windows installer
-        run: npm run build:win
+        working-directory: tauri-app
+        run: npm run tauri:build
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            dist/**/*.exe
-            dist/**/*.blockmap
-            dist/**/*.yml
+            tauri-app/src-tauri/target/release/bundle/nsis/*.exe
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -2,6 +2,9 @@ node_modules/
 dist/
 dist-*/
 build/
+tauri-app/node_modules/
+tauri-app/dist/
+tauri-app/src-tauri/target/
 *.log
 npm-debug.log*
 yarn-debug.log*
