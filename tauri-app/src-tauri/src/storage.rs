@@ -1,17 +1,37 @@
 use crate::models::{Config, InitialAppState, MessageItem, StorageChange, StorageMeta};
+use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Mutex;
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Manager, Monitor, PhysicalPosition, State, WebviewUrl, WebviewWindowBuilder};
 
 const MAX_MESSAGES: usize = 1000;
-
+const TOAST_WIDTH: f64 = 344.0;
+const TOAST_HEIGHT: f64 = 88.0;
+const TOAST_MARGIN_RIGHT: f64 = 18.0;
+const TOAST_MARGIN_BOTTOM: f64 = 18.0;
+const TOAST_GAP: f64 = 10.0;
+const MAX_TOAST_WINDOWS: usize = 5;
+const TOAST_WINDOW_PREFIX: &str = "toast-";
 pub struct AppState {
     storage_dir: Mutex<PathBuf>,
     storage_locked_by_env: bool,
     preference_path: PathBuf,
+    pending_toasts: Mutex<HashMap<String, ToastPayload>>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ToastPayload {
+    pub id: String,
+    pub title: String,
+    pub subtitle: String,
+    pub body: String,
+    pub verification_code: Option<String>,
+    pub duration: u64,
+    pub theme_mode: Option<String>,
 }
 
 impl AppState {
@@ -20,6 +40,7 @@ impl AppState {
             storage_dir: Mutex::new(storage_dir),
             storage_locked_by_env,
             preference_path,
+            pending_toasts: Mutex::new(HashMap::new()),
         }
     }
 
@@ -165,6 +186,57 @@ fn copy_data_files(source_dir: &Path, target_dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn toast_window_position(monitor: Option<Monitor>) -> (i32, i32, i32) {
+    if let Some(monitor) = monitor {
+        let scale = monitor.scale_factor();
+        let work_area = monitor.work_area();
+        let toast_width = (TOAST_WIDTH * scale).round() as i32;
+        let toast_height = (TOAST_HEIGHT * scale).round() as i32;
+        let margin_right = (TOAST_MARGIN_RIGHT * scale).round() as i32;
+        let margin_bottom = (TOAST_MARGIN_BOTTOM * scale).round() as i32;
+        let toast_gap = (TOAST_GAP * scale).round() as i32;
+        let x = work_area.position.x + work_area.size.width as i32 - toast_width - margin_right;
+        let y = work_area.position.y + work_area.size.height as i32 - toast_height - margin_bottom;
+        return (x, y, toast_height + toast_gap);
+    }
+
+    (100, 100, (TOAST_HEIGHT + TOAST_GAP) as i32)
+}
+
+fn resolve_toast_monitor(app: &AppHandle) -> Option<Monitor> {
+    app.primary_monitor().ok().flatten()
+        .or_else(|| app.available_monitors().ok().into_iter().flatten().next())
+}
+
+fn active_toast_labels(app: &AppHandle) -> Vec<String> {
+    app
+        .webview_windows()
+        .keys()
+        .filter(|label| label.starts_with(TOAST_WINDOW_PREFIX))
+        .cloned()
+        .collect()
+}
+
+fn reposition_toast_windows(app: &AppHandle) {
+    let monitor = resolve_toast_monitor(app);
+    let mut windows: Vec<(String, i32)> = active_toast_labels(app)
+        .into_iter()
+        .filter_map(|label| {
+            let window = app.get_webview_window(&label)?;
+            let y = window.outer_position().ok().map(|pos| pos.y).unwrap_or(i32::MIN);
+            Some((label, y))
+        })
+        .collect();
+    windows.sort_by(|a, b| b.1.cmp(&a.1));
+    for (index, (label, _)) in windows.iter().enumerate() {
+        if let Some(window) = app.get_webview_window(label) {
+            let (base_x, base_y, step) = toast_window_position(monitor.clone());
+            let y = base_y - (step * index as i32);
+            let _ = window.set_position(PhysicalPosition::new(base_x, y));
+        }
+    }
+}
+
 #[tauri::command]
 pub fn load_app_state(state: State<AppState>) -> Result<InitialAppState, String> {
     let storage_dir = state.current_storage_dir();
@@ -298,5 +370,71 @@ pub fn show_main_window(app: AppHandle) -> Result<(), String> {
     let _ = main_window.unminimize();
     main_window.show().map_err(|error| error.to_string())?;
     main_window.set_focus().map_err(|error| error.to_string())?;
+    Ok(())
+}
+#[tauri::command]
+pub async fn show_custom_toast(app: AppHandle, state: State<'_, AppState>, toast: ToastPayload) -> Result<(), String> {
+    let active = active_toast_labels(&app);
+    if active.len() >= MAX_TOAST_WINDOWS {
+        if let Some(oldest_label) = active.first() {
+            if let Some(oldest_win) = app.get_webview_window(oldest_label) {
+                let _ = oldest_win.close();
+            }
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+
+    let label = format!("{}{}", TOAST_WINDOW_PREFIX, toast.id.replace(['-', '.'], "_"));
+    let slot = active_toast_labels(&app).len();
+    let (base_x, base_y, step) = toast_window_position(resolve_toast_monitor(&app));
+    let y = base_y - (step * slot as i32);
+
+    let window = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("index.html".into()))
+        .title("Gotify Toast")
+        .inner_size(TOAST_WIDTH, TOAST_HEIGHT)
+        .position(0.0, 0.0)
+        .visible(false)
+        .transparent(true)
+        .focused(false)
+        .resizable(false)
+        .maximizable(false)
+        .minimizable(false)
+        .closable(true)
+        .decorations(false)
+        .skip_taskbar(true)
+        .always_on_top(true)
+        .shadow(false)
+        .build()
+        .map_err(|error| error.to_string())?;
+
+    let _ = window.set_position(PhysicalPosition::new(base_x, y));
+
+    state.pending_toasts.lock().unwrap().insert(label.clone(), toast.clone());
+
+    let app_for_close = app.clone();
+    window.on_window_event(move |event| {
+        if matches!(event, tauri::WindowEvent::Destroyed) {
+            reposition_toast_windows(&app_for_close);
+        }
+    });
+
+    window.show().map_err(|error| error.to_string())?;
+    let _ = window.set_position(PhysicalPosition::new(base_x, y));
+    reposition_toast_windows(&app);
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn get_toast_payload(state: State<'_, AppState>, label: String) -> Result<Option<ToastPayload>, String> {
+    let pending = state.pending_toasts.lock().unwrap();
+    Ok(pending.get(&label).cloned())
+}
+
+#[tauri::command]
+pub async fn close_toast_window(app: AppHandle, state: State<'_, AppState>, label: String) -> Result<(), String> {
+    state.pending_toasts.lock().unwrap().remove(&label);
+    if let Some(window) = app.get_webview_window(&label) {
+        window.close().map_err(|error| error.to_string())?;
+    }
     Ok(())
 }

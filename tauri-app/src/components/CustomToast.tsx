@@ -4,25 +4,52 @@ type CustomToastProps = {
   toast: CustomToast;
   onClose: (id: string) => void;
   onCopyCode: (code: string) => void;
+  onActivate?: () => void;
 };
 
-export function CustomToastCard({ toast, onClose, onCopyCode }: CustomToastProps) {
+function getInitial(text: string) {
+  const value = String(text || "").trim();
+  return value ? value.slice(0, 1) : "G";
+}
+
+export function CustomToastCard({ toast, onClose, onCopyCode, onActivate }: CustomToastProps) {
   return (
-    <div className="toast-card">
-      <div className="toast-top">
-        <div>
-          <div className="toast-title">{toast.title}</div>
-          <div className="toast-subtitle">{toast.subtitle}</div>
+    <div className={`feishu-toast ${onActivate ? "clickable" : ""}`} role="status" aria-live="polite" onClick={onActivate}>
+      <div className="feishu-toast-avatar-wrap">
+        <div className="feishu-toast-avatar">{getInitial(toast.subtitle || toast.title)}</div>
+      </div>
+      <div className="feishu-toast-main">
+        <div className="feishu-toast-head">
+          <div className="feishu-toast-title-row">
+            <div className="feishu-toast-title" title={toast.title}>{toast.title || "Gotify 消息"}</div>
+            <div className="feishu-toast-group" title={toast.subtitle}>{toast.subtitle || "Gotify"}</div>
+          </div>
         </div>
-        <button type="button" className="ghost-button" onClick={() => onClose(toast.id)}>关闭</button>
-      </div>
-      <div className="toast-body">{toast.body}</div>
-      <div className="toast-actions">
+        <div className="feishu-toast-line" title={toast.body}>{toast.body}</div>
         {toast.verificationCode ? (
-          <button type="button" className="primary-button" onClick={() => onCopyCode(toast.verificationCode || "")}>复制验证码</button>
+          <button
+            type="button"
+            className="feishu-toast-code"
+            onClick={(event) => {
+              event.stopPropagation();
+              onCopyCode(toast.verificationCode || "");
+            }}
+          >
+            验证码 {toast.verificationCode} · 点击复制
+          </button>
         ) : null}
-        <button type="button" className="secondary-button" onClick={() => onClose(toast.id)}>知道了</button>
       </div>
+      <button
+        type="button"
+        className="feishu-toast-close"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClose(toast.id);
+        }}
+        aria-label="关闭通知"
+      >
+        ×
+      </button>
     </div>
   );
 }

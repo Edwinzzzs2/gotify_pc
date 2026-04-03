@@ -89,13 +89,12 @@ export class DesktopRuntime {
   private isQuitting = false;
   private readonly trayId = "gotify-tray-main";
   private config: Config = { ...DEFAULT_CONFIG };
-  private status: ConnectionStatus = { connected: false, status: "未连接" };
+  private status: ConnectionStatus = { connected: false, status: "未连接", phase: "idle" };
   private appNames = new Map<number, string>();
   private applicationList: ApplicationInfo[] = [];
   private lastApplicationsFetchedAt = 0;
   private statusListeners = new Set<Listener<ConnectionStatus>>();
   private messageListeners = new Set<Listener<MessageItem>>();
-  private toastListeners = new Set<Listener<CustomToast>>();
   private openSettingsListeners = new Set<Listener<void>>();
   private messagesClearedListeners = new Set<Listener<void>>();
 
@@ -119,11 +118,6 @@ export class DesktopRuntime {
     return () => this.messageListeners.delete(listener);
   }
 
-  onCustomToast(listener: Listener<CustomToast>) {
-    this.toastListeners.add(listener);
-    return () => this.toastListeners.delete(listener);
-  }
-
   onOpenSettings(listener: Listener<void>) {
     this.openSettingsListeners.add(listener);
     return () => this.openSettingsListeners.delete(listener);
@@ -145,7 +139,7 @@ export class DesktopRuntime {
       // ignore unsupported platforms
     }
     this.config = nextConfig;
-    this.status = { connected: false, status: "未连接" };
+    this.status = { connected: false, status: "未连接", phase: "idle" };
 
     if (this.config.serverUrl && this.config.clientToken) {
       this.client.start(this.config);
@@ -323,27 +317,33 @@ export class DesktopRuntime {
       return;
     }
 
-    const currentWindow = getCurrentWindow();
-    const windowVisible = await currentWindow.isVisible().catch(() => true);
-    if (this.config.showCustomNotification && windowVisible) {
-      this.toastListeners.forEach((listener) =>
-        listener({
-          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          title: String(enriched.title || "Gotify 消息"),
-          subtitle: String(enriched.appname || `应用 #${enriched.appid || 0}`),
-          body: formatNotificationBody(String(enriched.message || "")),
-          verificationCode: extractVerificationCode(enriched) || undefined,
-          duration: this.config.notificationNeverClose
-            ? 0
-            : this.config.notificationAutoHide
-              ? Math.max(1000, Number(this.config.notificationDuration) || 5000)
-              : 0,
-        })
-      );
-      return;
+    if (this.config.showCustomNotification) {
+      const toast: CustomToast = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        title: String(enriched.title || "Gotify 消息"),
+        subtitle: String(enriched.appname || `应用 #${enriched.appid || 0}`),
+        body: formatNotificationBody(String(enriched.message || "")),
+        verificationCode: extractVerificationCode(enriched) || undefined,
+        themeMode: this.config.themeMode,
+        duration: this.config.notificationNeverClose
+          ? 0
+          : this.config.notificationAutoHide
+            ? Math.max(1000, Number(this.config.notificationDuration) || 5000)
+            : 0,
+      };
+      try {
+        await this.showDesktopToastWindow(toast);
+        return;
+      } catch (error) {
+        console.error("[toast] failed to show desktop toast window", error);
+      }
     }
 
     await this.sendNativeNotification(enriched);
+  }
+
+  private async showDesktopToastWindow(toast: CustomToast) {
+    await invoke("show_custom_toast", { toast });
   }
 
   private async sendNativeNotification(message: MessageItem) {
@@ -531,15 +531,8 @@ export class DesktopRuntime {
 
 export const desktopRuntime = new DesktopRuntime();
 
-
-
-
-
-
-
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     void TrayIcon.removeById("gotify-tray-main").catch(() => undefined);
   });
 }
-

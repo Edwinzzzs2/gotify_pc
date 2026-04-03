@@ -78,6 +78,7 @@ export function SettingsModal({
               <div className="form-row compact">
                 <div className="field-label">客户端令牌</div>
                 <input
+                  type="password"
                   className="text-input"
                   value={config.clientToken}
                   onChange={(event) => setConfig((prev) => ({ ...prev, clientToken: event.target.value }))}
@@ -91,8 +92,12 @@ export function SettingsModal({
             <div className="section-title">通知设置</div>
             <div className="checkbox-grid">
               <label className="checkbox-item">
-                <input type="checkbox" checked={config.showCustomNotification} onChange={(event) => setConfig((prev) => ({ ...prev, showCustomNotification: event.target.checked }))} />
-                <span>窗口内显示自定义提示卡</span>
+                <input
+                  type="checkbox"
+                  checked={config.showCustomNotification}
+                  onChange={(event) => setConfig((prev) => ({ ...prev, showCustomNotification: event.target.checked }))}
+                />
+                <span>使用飞书风格弹窗卡片（主窗口可见时）</span>
               </label>
               <label className="checkbox-item">
                 <input type="checkbox" checked={config.playSound} onChange={(event) => setConfig((prev) => ({ ...prev, playSound: event.target.checked }))} />
@@ -255,3 +260,5 @@ export function SettingsModal({
     </div>
   );
 }
+
+

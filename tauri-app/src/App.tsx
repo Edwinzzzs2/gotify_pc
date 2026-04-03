@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { CustomToastCard } from "@/components/CustomToast";
 import { MessageCard } from "@/components/MessageCard";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -14,6 +15,9 @@ import {
   type SettingsNotice,
   mergeConfig,
 } from "@/lib/types";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
+const isToastWindow = getCurrentWindow().label.startsWith("toast");
 
 function formatDate(value?: string | number) {
   if (value === undefined || value === null) {
@@ -26,10 +30,91 @@ function formatDate(value?: string | number) {
   return `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-export default function App() {
+function ToastWindowApp() {
+  const [toast, setToast] = useState<CustomToast | null>(null);
+
+  useEffect(() => {
+    document.body.classList.add("toast-window-mode");
+    const currentWindow = getCurrentWindow();
+    let timer: number | undefined;
+
+    const closeSelf = async () => {
+      if (timer) {
+        window.clearTimeout(timer);
+        timer = undefined;
+      }
+      setToast(null);
+      await invoke("close_toast_window", { label: currentWindow.label }).catch(() => undefined);
+    };
+
+    const setup = async () => {
+      let payload: CustomToast | null = null;
+      for (let i = 0; i < 8; i += 1) {
+        payload = await invoke<CustomToast | null>("get_toast_payload", { label: currentWindow.label }).catch(() => null);
+        if (payload) {
+          break;
+        }
+        await new Promise((resolve) => window.setTimeout(resolve, 40));
+      }
+      if (!payload) {
+        void closeSelf();
+        return () => undefined;
+      }
+      if (payload.themeMode) {
+        document.documentElement.setAttribute("data-theme", payload.themeMode);
+      } else {
+        document.documentElement.setAttribute("data-theme", "white");
+      }
+      setToast(payload);
+      if (payload.duration > 0) {
+        timer = window.setTimeout(() => {
+          void closeSelf();
+        }, payload.duration);
+      }
+      return () => undefined;
+    };
+
+    let cleanup = () => undefined;
+    void setup().then((unlisten) => {
+      cleanup = unlisten;
+    });
+
+    return () => {
+      cleanup();
+      if (timer) {
+        window.clearTimeout(timer);
+      }
+      document.body.classList.remove("toast-window-mode");
+    };
+  }, []);
+
+  const closeToast = async () => {
+    await invoke("close_toast_window", { label: getCurrentWindow().label }).catch(() => undefined);
+  };
+
+  const activateToast = async () => {
+    await invoke("show_main_window").catch(() => undefined);
+    await closeToast();
+  };
+
+  const copyCode = async (code: string) => {
+    if (!code) {
+      return;
+    }
+    await navigator.clipboard.writeText(code).catch(() => undefined);
+  };
+
+  return (
+    <div className="toast-window-shell">
+      {toast ? <CustomToastCard toast={toast} onClose={() => void closeToast()} onCopyCode={(code) => void copyCode(code)} onActivate={() => void activateToast()} /> : null}
+    </div>
+  );
+}
+
+function MainApp() {
   const [config, setConfig] = useState<Config>({ ...DEFAULT_CONFIG, themeMode: getStoredThemeMode() });
   const [messages, setMessages] = useState<MessageItem[]>([]);
-  const [status, setStatus] = useState<ConnectionStatus>({ connected: false, status: "未连接" });
+  const [status, setStatus] = useState<ConnectionStatus>({ connected: false, status: "未连接", phase: "idle" });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState(false);
@@ -45,7 +130,6 @@ export default function App() {
   const [searchText, setSearchText] = useState("");
   const [showFavorites, setShowFavorites] = useState(false);
   const [appVersion, setAppVersion] = useState("-");
-  const [toasts, setToasts] = useState<CustomToast[]>([]);
 
   useEffect(() => {
     applyThemeMode(config.themeMode);
@@ -55,7 +139,6 @@ export default function App() {
     let active = true;
     let unsubStatus = () => undefined;
     let unsubMessage = () => undefined;
-    let unsubToast = () => undefined;
     let unsubOpenSettings = () => undefined;
     let unsubMessagesCleared = () => undefined;
 
@@ -63,25 +146,13 @@ export default function App() {
       try {
         unsubStatus = desktopRuntime.onConnectionStatus((payload) => active && setStatus(payload));
         unsubMessage = desktopRuntime.onNewMessage((payload) => active && setMessages((prev) => [payload, ...prev]));
-        unsubToast = desktopRuntime.onCustomToast((toast) => {
-          if (!active) {
-            return;
-          }
-          setToasts((prev) => [toast, ...prev].slice(0, 5));
-          if (toast.duration > 0) {
-            window.setTimeout(() => {
-              setToasts((prev) => prev.filter((item) => item.id !== toast.id));
-            }, toast.duration);
-          }
-        });
         unsubOpenSettings = desktopRuntime.onOpenSettings(() => active && setSettingsOpen(true));
         unsubMessagesCleared = desktopRuntime.onMessagesCleared(() => active && setMessages([]));
 
         const initialState = await desktopRuntime.init();
-        const [version, apps, nextStatus] = await Promise.all([
+        const [version, apps] = await Promise.all([
           desktopRuntime.getAppVersion(),
           desktopRuntime.getApplications(),
-          desktopRuntime.getConnectionStatus(),
         ]);
 
         if (!active) {
@@ -96,7 +167,7 @@ export default function App() {
         setDraftStoragePath(nextStoragePath);
         setAppVersion(version);
         setApplications(Array.isArray(apps) ? apps : []);
-        setStatus(nextStatus);
+        setStatus(await desktopRuntime.getConnectionStatus());
       } catch (error) {
         if (active) {
           setBanner(`初始化失败: ${error instanceof Error ? error.message : "未知错误"}`);
@@ -108,13 +179,12 @@ export default function App() {
       }
     };
 
-    run();
+    void run();
 
     return () => {
       active = false;
       unsubStatus();
       unsubMessage();
-      unsubToast();
       unsubOpenSettings();
       unsubMessagesCleared();
     };
@@ -128,7 +198,15 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [banner]);
 
-  const statusClass = status.connected ? "online" : status.status?.includes("重连") ? "reconnecting" : "offline";
+  const statusClass = status.phase === "online"
+    ? "online"
+    : status.phase === "connecting"
+      ? "connecting"
+      : status.phase === "reconnecting"
+        ? "reconnecting"
+        : status.phase === "error"
+          ? "offline"
+          : "idle";
 
   const appIdSet = useMemo(() => new Set(messages.map((item) => Number(item.appid || 0)).filter((id) => id > 0)), [messages]);
 
@@ -159,6 +237,8 @@ export default function App() {
     return result;
   }, [messages, searchText, selectedAppId, showFavorites]);
 
+  const favoriteCount = useMemo(() => messages.filter((item) => item.favorite).length, [messages]);
+
   const getAppLabel = (appid?: number) => {
     const id = Number(appid || 0);
     if (!id) {
@@ -188,23 +268,20 @@ export default function App() {
   };
 
   const onTest = async () => {
+    const serverUrl = String(config.serverUrl || "").trim();
+    const clientToken = String(config.clientToken || "").trim();
+    if (!serverUrl) {
+      setSettingsNotice({ text: "请先填写服务器地址", type: "error" });
+      return;
+    }
     setTesting(true);
     try {
-      await desktopRuntime.testConnection({ serverUrl: config.serverUrl, clientToken: config.clientToken });
+      await desktopRuntime.testConnection({ serverUrl, clientToken });
       setSettingsNotice({ text: "连接测试成功", type: "info" });
     } catch (error) {
       setSettingsNotice({ text: `连接测试失败: ${error instanceof Error ? error.message : "未知错误"}`, type: "error" });
     } finally {
       setTesting(false);
-    }
-  };
-
-  const onToggleConnection = async () => {
-    try {
-      await desktopRuntime.toggleConnection();
-      await refreshApplications();
-    } catch (error) {
-      setBanner(`操作失败: ${error instanceof Error ? error.message : "未知错误"}`);
     }
   };
 
@@ -262,18 +339,6 @@ export default function App() {
     }
   };
 
-  const onCopyToastCode = async (code: string) => {
-    if (!code) {
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(code);
-      setBanner(`验证码 ${code} 已复制`);
-    } catch {
-      setBanner("复制失败，请手动复制");
-    }
-  };
-
   if (loading) {
     return (
       <div className="app-shell">
@@ -288,29 +353,21 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <section className="app-panel app-header">
-        <div className="brand">
-          <div className="brand-mark">G</div>
-          <div>
-            <div className="brand-title">Gotify 客户端</div>
-            <div className="brand-subtitle">React + Tauri 重构版，支持黑白双皮肤和托盘运行</div>
-          </div>
-        </div>
-        <div className="header-actions">
-          <button type="button" className={`segment-button ${!showFavorites ? "active" : ""}`} onClick={() => setShowFavorites(false)}>历史消息</button>
-          <button type="button" className={`segment-button ${showFavorites ? "active" : ""}`} onClick={() => setShowFavorites(true)}>我的收藏</button>
-        </div>
-      </section>
-
       <section className="main-grid">
         <div className="app-panel message-panel">
+          <div className="content-header">
+            <div className="content-title-row">
+              <div className="page-heading">
+                <div className="page-title">消息</div>
+              </div>
+            </div>
+          </div>
+
           <div className="toolbar">
-            <div className="filter-row">
+            <div className="filter-row filter-row-main">
               <div className="search-box">
-                <input className="text-input" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="搜索标题或消息正文..." />
-                {searchText ? (
-                  <button type="button" className="clear-search" onClick={() => setSearchText("")}>×</button>
-                ) : null}
+                <input className="text-input" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="搜索标题或消息正文" />
+                {searchText ? <button type="button" className="clear-search" onClick={() => setSearchText("")}>×</button> : null}
               </div>
               <select className="select-input" value={selectedAppId} onChange={(event) => setSelectedAppId(event.target.value)}>
                 {applicationOptions.map((item) => (
@@ -318,7 +375,10 @@ export default function App() {
                 ))}
               </select>
             </div>
-            <div className="count-text">{visibleMessages.length} 条消息</div>
+            <div className="toolbar-actions compact inline-toggle-group">
+              <button type="button" className={`segment-button ${!showFavorites ? "active" : ""}`} onClick={() => setShowFavorites(false)}>全部消息</button>
+              <button type="button" className={`segment-button ${showFavorites ? "active" : ""}`} onClick={() => setShowFavorites(true)}>收藏 {favoriteCount}</button>
+            </div>
           </div>
 
           {banner ? <div className="banner">{banner}</div> : null}
@@ -333,15 +393,21 @@ export default function App() {
             )}
           </div>
 
-          <div className="footer-bar">
-            <div className="status-row">
-              <div className={`status-dot ${statusClass}`}></div>
-              <div className="status-text">{status.status || "未连接"}</div>
-            </div>
-            <div className="footer-actions">
-              <button type="button" className="secondary-button" onClick={onToggleConnection}>{status.connected ? "断开连接" : "建立连接"}</button>
-              <button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>设置</button>
-              <button type="button" className="danger-button" onClick={onClearMessages} disabled={visibleMessages.length === 0 || clearing}>{clearing ? "清空中..." : "清空消息"}</button>
+          <div className="footer-panel">
+            <div className="footer-bar">
+              <div className="footer-meta">
+                <div className="overview-chip">
+                  <span className={`status-dot ${statusClass}`}></span>
+                  <span>{status.status || "未连接"}</span>
+                </div>
+                <div className="overview-chip emphasis">当前实时 {visibleMessages.length} 条</div>
+                {selectedAppId !== "all" ? <div className="overview-chip">当前分组 {getAppLabel(Number(selectedAppId))}</div> : null}
+                {searchText ? <div className="overview-chip">关键词 “{searchText}”</div> : null}
+              </div>
+              <div className="footer-actions">
+                <button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>设置</button>
+                <button type="button" className="danger-button" onClick={onClearMessages} disabled={visibleMessages.length === 0 || clearing}>{clearing ? "清空中..." : "清空消息"}</button>
+              </div>
             </div>
           </div>
         </div>
@@ -367,20 +433,10 @@ export default function App() {
         onOpenStoragePath={() => void desktopRuntime.openStoragePath()}
         applyingStoragePath={applyingStoragePath}
       />
-
-      {toasts.length > 0 ? (
-        <div className="toast-stack">
-          {toasts.map((toast) => (
-            <CustomToastCard
-              key={toast.id}
-              toast={toast}
-              onClose={(id) => setToasts((prev) => prev.filter((item) => item.id !== id))}
-              onCopyCode={onCopyToastCode}
-            />
-          ))}
-        </div>
-      ) : null}
     </div>
   );
 }
 
+export default function App() {
+  return isToastWindow ? <ToastWindowApp /> : <MainApp />;
+}

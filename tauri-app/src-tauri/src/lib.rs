@@ -3,9 +3,9 @@ mod storage;
 
 use tauri::Manager;
 use storage::{
-    add_message, clear_messages, get_messages, get_storage_meta, load_app_state, open_storage_path,
-    quit_app, resolve_storage_dir, save_config, set_storage_path, show_main_window, toggle_favorite,
-    AppState,
+    add_message, clear_messages, close_toast_window, get_messages, get_storage_meta, get_toast_payload,
+    load_app_state, open_storage_path, quit_app, resolve_storage_dir, save_config, set_storage_path,
+    show_custom_toast, show_main_window, toggle_favorite, AppState,
 };
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -39,6 +39,9 @@ pub fn run() {
             open_storage_path,
             quit_app,
             show_main_window,
+            show_custom_toast,
+            close_toast_window,
+            get_toast_payload,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

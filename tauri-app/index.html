@@ -7,7 +7,11 @@
     <script>
       const mode = localStorage.getItem("gotify-theme-mode") === "black" ? "black" : "white";
       document.documentElement.dataset.theme = mode;
+      const isToast = window.location.search.includes('toast') || window.location.hash.includes('toast') || window.name.includes('toast') || (typeof window.__TAURI__ !== 'undefined' && window.__TAURI__.window.getCurrent().label.includes('toast'));
       document.documentElement.style.colorScheme = mode === "black" ? "dark" : "light";
+      if (isToast) {
+        document.documentElement.style.background = "transparent";
+      }
     </script>
   </head>
   <body>

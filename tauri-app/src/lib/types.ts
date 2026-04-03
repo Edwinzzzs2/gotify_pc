@@ -51,6 +51,7 @@ export type StorageChange = {
 export type ConnectionStatus = {
   connected?: boolean;
   status?: string;
+  phase?: "idle" | "connecting" | "online" | "reconnecting" | "error";
 };
 
 export type SettingsNotice = {
@@ -65,6 +66,7 @@ export type CustomToast = {
   body: string;
   verificationCode?: string;
   duration: number;
+  themeMode?: string;
 };
 
 export type InitialAppState = {
@@ -76,3 +78,5 @@ export type InitialAppState = {
 export function mergeConfig(config?: Partial<Config> | null): Config {
   return { ...DEFAULT_CONFIG, ...(config || {}) };
 }
+
+

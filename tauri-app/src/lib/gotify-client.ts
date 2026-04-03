@@ -5,6 +5,7 @@ type Listener<T> = (payload: T) => void;
 export class BrowserGotifyClient {
   private ws: WebSocket | null = null;
   private reconnectTimer: number | null = null;
+  private connectingTimer: number | null = null;
   private connected = false;
   private config: Config | null = null;
   private reconnectDelay = 5000;
@@ -12,7 +13,7 @@ export class BrowserGotifyClient {
   private lastErrorMessage = "";
   private seenMessageIds = new Set<number>();
   private seenMessageKeys = new Map<string, number>();
-  private duplicateWindowMs = 1500;
+  private duplicateWindowMs = 300;
   private statusListeners = new Set<Listener<ConnectionStatus>>();
   private messageListeners = new Set<Listener<MessageItem>>();
 
@@ -32,6 +33,7 @@ export class BrowserGotifyClient {
 
   start(config: Config) {
     this.clearReconnect();
+    this.clearConnecting();
     if (this.ws) {
       try {
         this.ws.close();
@@ -53,6 +55,7 @@ export class BrowserGotifyClient {
   stop() {
     this.intentionalDisconnect = true;
     this.clearReconnect();
+    this.clearConnecting();
     if (this.ws) {
       try {
         this.ws.close();
@@ -61,18 +64,25 @@ export class BrowserGotifyClient {
       }
     }
     this.ws = null;
-    this.setConnected(false, "已断开连接");
+    this.setConnected(false, "已断开连接", "idle");
   }
 
   private connect() {
     if (!this.config?.serverUrl || !this.config?.clientToken) {
-      this.setConnected(false, "未配置服务器地址或客户端令牌");
+      this.setConnected(false, "未配置服务器地址或客户端令牌", "idle");
       return;
     }
     if (this.ws && (this.ws.readyState === WebSocket.CONNECTING || this.ws.readyState === WebSocket.OPEN)) {
       return;
     }
-    this.setConnected(false, "正在连接...");
+    this.clearConnecting();
+    this.connectingTimer = window.setTimeout(() => {
+      this.connectingTimer = null;
+      if (this.ws === null || this.ws.readyState !== WebSocket.CONNECTING) {
+        return;
+      }
+      this.setConnected(false, "正在连接...", "connecting");
+    }, 800);
     const wsUrl = this.buildWsUrl(this.config.serverUrl, this.config.clientToken);
     try {
       const socket = new WebSocket(wsUrl);
@@ -81,9 +91,10 @@ export class BrowserGotifyClient {
         if (this.ws !== socket) {
           return;
         }
+        this.clearConnecting();
         this.lastErrorMessage = "";
         this.reconnectDelay = 5000;
-        this.setConnected(true, "已连接");
+        this.setConnected(true, "已连接", "online");
       });
       socket.addEventListener("message", (event) => {
         try {
@@ -103,23 +114,29 @@ export class BrowserGotifyClient {
         if (this.ws !== socket) {
           return;
         }
+        this.clearConnecting();
         this.lastErrorMessage = "连接异常";
-        this.setConnected(false, this.lastErrorMessage);
+        this.setConnected(false, this.lastErrorMessage, "error");
       });
       socket.addEventListener("close", (event) => {
+        if (this.ws !== socket) {
+          return;
+        }
+        this.clearConnecting();
         if (this.ws === socket) {
           this.ws = null;
         }
         const closeText = event.reason ? `连接已断开: ${event.code} ${event.reason}` : `连接已断开: ${event.code}`;
         const statusText = this.lastErrorMessage ? `${closeText} (${this.lastErrorMessage})` : closeText;
-        this.setConnected(false, statusText);
+        this.setConnected(false, statusText, this.config?.enableReconnect && !this.intentionalDisconnect ? "reconnecting" : "error");
         if (!this.intentionalDisconnect && this.config?.enableReconnect) {
           this.scheduleReconnect();
         }
       });
     } catch (error) {
+      this.clearConnecting();
       const message = error instanceof Error ? error.message : "未知错误";
-      this.setConnected(false, `连接失败: ${message}`);
+      this.setConnected(false, `连接失败: ${message}`, "error");
       if (!this.intentionalDisconnect && this.config?.enableReconnect) {
         this.scheduleReconnect();
       }
@@ -137,15 +154,15 @@ export class BrowserGotifyClient {
     return `ws://${normalized}/stream?token=${encodeURIComponent(token)}`;
   }
 
-  private setConnected(connected: boolean, status: string) {
+  private setConnected(connected: boolean, status: string, phase: ConnectionStatus["phase"] = connected ? "online" : "idle") {
     this.connected = connected;
-    this.statusListeners.forEach((listener) => listener({ connected, status }));
+    this.statusListeners.forEach((listener) => listener({ connected, status, phase }));
   }
 
   private scheduleReconnect() {
     this.clearReconnect();
     this.statusListeners.forEach((listener) =>
-      listener({ connected: false, status: `重连中，${Math.floor(this.reconnectDelay / 1000)} 秒后重试` })
+      listener({ connected: false, status: `重连中，${Math.floor(this.reconnectDelay / 1000)} 秒后重试`, phase: "reconnecting" })
     );
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectDelay = Math.min(this.reconnectDelay + 1000, 30000);
@@ -157,6 +174,13 @@ export class BrowserGotifyClient {
     if (this.reconnectTimer !== null) {
       window.clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+  }
+
+  private clearConnecting() {
+    if (this.connectingTimer !== null) {
+      window.clearTimeout(this.connectingTimer);
+      this.connectingTimer = null;
     }
   }
 
@@ -183,6 +207,7 @@ export class BrowserGotifyClient {
         this.seenMessageIds.clear();
         this.seenMessageIds.add(messageId);
       }
+      return false;
     }
 
     const key = `${Number(message.appid || 0)}|${String(message.title || "")}|${String(message.message || "")}`;
