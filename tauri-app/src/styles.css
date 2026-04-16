@@ -828,6 +828,33 @@ button {
   cursor: pointer;
 }
 
+.captcha-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: normal;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.captcha-button:hover {
+  background: var(--card-hover-alt);
+  color: var(--text);
+  border-color: var(--border-light);
+}
+
+.captcha-button.copied {
+  color: var(--success-text);
+  border-color: var(--success-color);
+}
+
 .feishu-toast.clickable:hover {
   background: var(--card-hover);
   box-shadow: 0 6px 20px var(--shadow-color);
