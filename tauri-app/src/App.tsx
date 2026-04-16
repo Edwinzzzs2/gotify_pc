@@ -342,10 +342,8 @@ function MainApp() {
   if (loading) {
     return (
       <div className="app-shell">
-        <div className="app-panel message-panel" style={{ justifyContent: "center", alignItems: "center" }}>
-          <div className="brand-mark">G</div>
-          <div className="brand-title" style={{ marginTop: 12 }}>正在初始化桌面客户端...</div>
-          <div className="brand-subtitle">React + Tauri 正在接管 Gotify 连接和本地状态</div>
+        <div className="app-panel message-panel flat-layout" style={{ justifyContent: "center", alignItems: "center" }}>
+          <div className="brand-title" style={{ marginTop: 12 }}>正在初始化客户端...</div>
         </div>
       </div>
     );
@@ -354,30 +352,23 @@ function MainApp() {
   return (
     <div className="app-shell">
       <section className="main-grid">
-        <div className="app-panel message-panel">
-          <div className="content-header">
-            <div className="content-title-row">
-              <div className="page-heading">
-                <div className="page-title">消息</div>
-              </div>
+        <div className="app-panel message-panel flat-layout">
+          <div className="toolbar flat-toolbar">
+            <div className="header-tabs">
+              <button type="button" className={`header-tab ${!showFavorites ? "active" : ""}`} onClick={() => setShowFavorites(false)}>历史消息</button>
+              <button type="button" className={`header-tab ${showFavorites ? "active" : ""}`} onClick={() => setShowFavorites(true)}>我的收藏</button>
             </div>
-          </div>
-
-          <div className="toolbar">
-            <div className="filter-row filter-row-main">
+            <div className="header-actions-right">
               <div className="search-box">
-                <input className="text-input" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="搜索标题或消息正文" />
+                <input className="text-input flat-input" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="搜索消息..." />
                 {searchText ? <button type="button" className="clear-search" onClick={() => setSearchText("")}>×</button> : null}
               </div>
-              <select className="select-input" value={selectedAppId} onChange={(event) => setSelectedAppId(event.target.value)}>
+              <select className="select-input flat-input" value={selectedAppId} onChange={(event) => setSelectedAppId(event.target.value)}>
                 {applicationOptions.map((item) => (
                   <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
               </select>
-            </div>
-            <div className="toolbar-actions compact inline-toggle-group">
-              <button type="button" className={`segment-button ${!showFavorites ? "active" : ""}`} onClick={() => setShowFavorites(false)}>全部消息</button>
-              <button type="button" className={`segment-button ${showFavorites ? "active" : ""}`} onClick={() => setShowFavorites(true)}>收藏 {favoriteCount}</button>
+              <div className="count-text">{visibleMessages.length} 条消息</div>
             </div>
           </div>
 
@@ -393,20 +384,18 @@ function MainApp() {
             )}
           </div>
 
-          <div className="footer-panel">
+          <div className="footer-panel flat-footer">
             <div className="footer-bar">
               <div className="footer-meta">
-                <div className="overview-chip">
+                <div className="status-indicator">
                   <span className={`status-dot ${statusClass}`}></span>
-                  <span>{status.status || "未连接"}</span>
+                  <span className="status-text-label">{status.status || "未连接"}</span>
                 </div>
-                <div className="overview-chip emphasis">当前实时 {visibleMessages.length} 条</div>
-                {selectedAppId !== "all" ? <div className="overview-chip">当前分组 {getAppLabel(Number(selectedAppId))}</div> : null}
-                {searchText ? <div className="overview-chip">关键词 “{searchText}”</div> : null}
               </div>
               <div className="footer-actions">
-                <button type="button" className="secondary-button" onClick={() => setSettingsOpen(true)}>设置</button>
-                <button type="button" className="danger-button" onClick={onClearMessages} disabled={visibleMessages.length === 0 || clearing}>{clearing ? "清空中..." : "清空消息"}</button>
+                <button type="button" className="flat-button secondary-button" disabled>断开</button>
+                <button type="button" className="flat-button secondary-button" onClick={() => setSettingsOpen(true)}>设置</button>
+                <button type="button" className="flat-button danger-button" onClick={onClearMessages} disabled={visibleMessages.length === 0 || clearing}>{clearing ? "..." : "清空消息"}</button>
               </div>
             </div>
           </div>

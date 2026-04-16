@@ -30,8 +30,8 @@
     "active": true,
     "targets": ["nsis"],
     "icon": [
-      "../../defaultapp.png",
-      "../../build/defaultapp.ico"
+      "icons/defaultapp.png",
+      "icons/defaultapp.ico"
     ],
     "windows": {
       "nsis": {

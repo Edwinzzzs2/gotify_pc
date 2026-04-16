@@ -23,4 +23,9 @@ export function applyThemeMode(mode: ThemeMode) {
   if (typeof window !== "undefined") {
     window.localStorage.setItem(THEME_STORAGE_KEY, mode);
   }
+
+  // 同步更新 Tauri 原生窗口标题栏主题（黑色模式 → dark，否则 → light）
+  void import("@tauri-apps/api/window")
+    .then(({ getCurrentWindow }) => getCurrentWindow().setTheme(mode === "black" ? "dark" : "light"))
+    .catch(() => undefined);
 }

@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Image } from "@tauri-apps/api/image";
 import { Menu } from "@tauri-apps/api/menu";
 import { TrayIcon } from "@tauri-apps/api/tray";
+import appIconUrl from "../defaultapp.png";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { disable as disableAutostart, enable as enableAutostart, isEnabled as isAutostartEnabled } from "@tauri-apps/plugin-autostart";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -37,7 +38,7 @@ function formatNotificationBody(rawText?: string) {
   return merged.length > 200 ? `${merged.slice(0, 200)}...` : merged;
 }
 
-function extractVerificationCode(message: MessageItem) {
+export function extractVerificationCode(message: MessageItem) {
   const title = String(message.title || "");
   const body = String(message.message || "");
   if ((title.includes("验证码") || body.includes("验证码")) && /\d{4,8}/.test(body)) {
@@ -519,13 +520,52 @@ export class DesktopRuntime {
       return this.trayIcon;
     }
 
+    // 用 Canvas 将 PNG URL 解码为 32x32 RGBA 原始像素，再传给 Image.new()
     try {
-      const { data, size } = createTrayIconData();
-      this.trayIcon = await Image.new(data, size, size);
-      return this.trayIcon;
+      const icon = await new Promise<import("@tauri-apps/api/image").Image | null>((resolve) => {
+        const img = new window.Image();
+        img.onload = () => {
+          try {
+            const size = 32;
+            const canvas = document.createElement("canvas");
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext("2d");
+            if (!ctx) { resolve(null); return; }
+            ctx.drawImage(img, 0, 0, size, size);
+            const rgba = new Uint8Array(ctx.getImageData(0, 0, size, size).data.buffer);
+            Image.new(rgba, size, size).then(resolve).catch(() => resolve(null));
+          } catch {
+            resolve(null);
+          }
+        };
+        img.onerror = () => resolve(null);
+        img.src = appIconUrl;
+      });
+      if (icon) {
+        this.trayIcon = icon;
+        return icon;
+      }
     } catch {
-      return defaultWindowIcon().catch(() => null);
+      // ignore
     }
+
+    // Fallback：使用 Tauri 内置窗口图标
+    try {
+      const icon = await defaultWindowIcon();
+      if (icon) {
+        this.trayIcon = icon;
+        return icon;
+      }
+    } catch {
+      // ignore
+    }
+
+    return null;
+  }
+
+  stop() {
+    this.client.stop();
   }
 }
 
@@ -533,6 +573,7 @@ export const desktopRuntime = new DesktopRuntime();
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
+    desktopRuntime.stop();
     void TrayIcon.removeById("gotify-tray-main").catch(() => undefined);
   });
 }

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { CustomToast } from "@/lib/types";
 
 type CustomToastProps = {
@@ -13,6 +14,8 @@ function getInitial(text: string) {
 }
 
 export function CustomToastCard({ toast, onClose, onCopyCode, onActivate }: CustomToastProps) {
+  const [copied, setCopied] = useState(false);
+
   return (
     <div className={`feishu-toast ${onActivate ? "clickable" : ""}`} role="status" aria-live="polite" onClick={onActivate}>
       <div className="feishu-toast-avatar-wrap">
@@ -33,9 +36,11 @@ export function CustomToastCard({ toast, onClose, onCopyCode, onActivate }: Cust
             onClick={(event) => {
               event.stopPropagation();
               onCopyCode(toast.verificationCode || "");
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
             }}
           >
-            验证码 {toast.verificationCode} · 点击复制
+            {copied ? "已复制！" : `验证码 ${toast.verificationCode} · 点击复制`}
           </button>
         ) : null}
       </div>

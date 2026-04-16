@@ -234,7 +234,7 @@ export function SettingsModal({
             <div className="checkbox-grid" style={{ marginTop: 16 }}>
               <label className="checkbox-item">
                 <input type="checkbox" checked={config.minimizeToTray} onChange={(event) => setConfig((prev) => ({ ...prev, minimizeToTray: event.target.checked }))} />
-                <span>关闭窗口时缩到托盘</span>
+                <span>关闭窗口时缩小到任务栏</span>
               </label>
               <label className="checkbox-item">
                 <input type="checkbox" checked={config.autoLaunch} onChange={(event) => setConfig((prev) => ({ ...prev, autoLaunch: event.target.checked }))} />

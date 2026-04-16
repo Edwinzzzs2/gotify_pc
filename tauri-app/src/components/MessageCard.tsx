@@ -8,8 +8,17 @@ type MessageCardProps = {
   formatDate: (value?: string | number) => string;
 };
 
+function extractVerificationCode(title: string, body: string) {
+  if ((title.includes("验证码") || body.includes("验证码")) && /\d{4,8}/.test(body)) {
+    const match = body.match(/\d{4,8}/);
+    return match?.[0] || "";
+  }
+  return "";
+}
+
 export function MessageCard({ item, appLabel, onToggleFavorite, formatDate }: MessageCardProps) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
   const rawMessage = String(item.message || "");
   const lines = rawMessage.split("\n");
   const maxLines = 4;
@@ -27,6 +36,17 @@ export function MessageCard({ item, appLabel, onToggleFavorite, formatDate }: Me
 
   const visibleMessage = expanded || !canCollapse ? rawMessage : collapsedText;
   const priorityColor = item.priority && item.priority >= 8 ? "#ef4444" : item.priority && item.priority >= 4 ? "#3b82f6" : "#22c55e";
+
+  const code = extractVerificationCode(String(item.title || ""), rawMessage);
+
+  const copyCode = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (code) {
+      await navigator.clipboard.writeText(code).catch(() => undefined);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <div className="message-card">
@@ -50,10 +70,24 @@ export function MessageCard({ item, appLabel, onToggleFavorite, formatDate }: Me
           </div>
         </div>
         <div className="message-body">{visibleMessage}</div>
+        {code ? (
+          <div style={{ marginTop: 8 }}>
+            <button
+              type="button"
+              className="feishu-toast-code"
+              onClick={copyCode}
+              style={{ cursor: "pointer", height: "26px", fontSize: "13px" }}
+            >
+              {copied ? "已复制！" : `验证码 ${code} · 点击复制`}
+            </button>
+          </div>
+        ) : null}
         {canCollapse ? (
-          <button type="button" className="link-button" onClick={() => setExpanded((prev) => !prev)}>
-            {expanded ? "收起" : "展开"}
-          </button>
+          <div className="message-actions" style={{ display: "flex", gap: "8px", marginTop: "8px" }}>
+            <button type="button" className="link-button" onClick={() => setExpanded((prev) => !prev)}>
+              {expanded ? "收起" : "展开"}
+            </button>
+          </div>
         ) : null}
       </div>
     </div>
