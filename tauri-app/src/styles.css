@@ -180,14 +180,14 @@ button {
 .text-input,
 .select-input,
 .number-input {
-  height: 32px;
+  height: 28px;
   border-radius: 4px;
   border: 1px solid var(--border);
   background: var(--panel);
   color: var(--text);
-  padding: 0 12px;
+  padding: 0 10px;
   outline: none;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .overview-chip.emphasis {
@@ -251,22 +251,41 @@ button {
 
 .header-tabs {
   display: flex;
-  gap: 16px;
+  gap: 20px;
 }
 
 .header-tab {
   background: transparent;
   border: none;
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text-muted);
   padding: 0;
   cursor: pointer;
   font-weight: 500;
+  position: relative;
+  transition: color 0.15s;
+}
+
+.header-tab:hover {
+  color: var(--text);
+  background: transparent;
 }
 
 .header-tab.active {
-  color: var(--text);
-  font-weight: 700;
+  color: var(--primary);
+  font-weight: 600;
+  background: transparent;
+}
+
+.header-tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: -13px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+  border-radius: 2px 2px 0 0;
 }
 
 .header-actions-right {
@@ -277,7 +296,7 @@ button {
 
 .count-text {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 11px;
   margin-left: 4px;
 }
 
@@ -391,8 +410,8 @@ button {
 .message-card {
   display: grid;
   grid-template-columns: 4px minmax(0, 1fr);
-  gap: 16px;
-  padding: 16px 20px;
+  gap: 14px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--border-light);
   background: var(--panel);
 }
@@ -405,19 +424,93 @@ button {
   border-radius: 999px;
 }
 
-.message-header {
+.message-content {
+  min-width: 0;
+}
+
+.message-row1 {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
+  line-height: 22px;
+}
+
+.message-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .message-title {
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.4;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.message-meta,
+.message-row1-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 22px;
+}
+
+.message-app-tag {
+  padding: 0 7px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 3px;
+  background: var(--card-hover-alt);
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.message-star {
+  border: none;
+  background: transparent;
+  color: var(--text-disabled);
+  padding: 0;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.message-star:hover {
+  color: var(--text-muted);
+  background: var(--card-hover-alt);
+}
+
+.message-star.active {
+  color: #f59e0b;
+}
+
+.message-time {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.message-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+}
+
 .status-text,
 .count-text,
 .field-hint,
@@ -428,13 +521,6 @@ button {
   color: var(--text-muted);
 }
 
-.message-meta {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  font-size: 13px;
-}
-
 .segment-button,
 .action-button,
 .secondary-button,
@@ -443,12 +529,12 @@ button {
 .ghost-button {
   border-radius: 4px;
   border: 1px solid var(--border);
-  height: 32px;
-  padding: 0 16px;
+  height: 28px;
+  padding: 0 12px;
   background: var(--panel);
   color: var(--text);
-  transition: none;
-  font-size: 13px;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+  font-size: 12px;
   cursor: pointer;
 }
 
@@ -488,47 +574,28 @@ button {
   cursor: not-allowed;
 }
 
-.favorite-button {
-  border: none;
-  background: transparent;
-  color: var(--text-muted);
-  width: 28px;
-  height: 28px;
-  border-radius: 999px;
-  display: grid;
-  place-items: center;
-}
 
-.favorite-button.active {
-  color: #f59e0b;
-}
-
-.favorite-button:hover {
-  background: var(--card-hover);
-}
-
-.message-app {
-  margin-top: 4px;
-  color: var(--text-muted);
-  font-size: 13px;
-}
 
 .message-body {
   margin-top: 6px;
   white-space: pre-wrap;
   word-break: break-word;
-  line-height: 1.65;
+  line-height: 1.6;
   color: var(--text-soft);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .link-button {
   border: none;
   padding: 0;
   background: transparent;
-  color: var(--text-soft);
-  margin-top: 8px;
+  color: var(--primary);
   font-size: 12px;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  text-decoration: underline;
 }
 
 .empty-state {
@@ -568,10 +635,12 @@ button {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 4px;
-  padding: 4px 16px;
-  font-size: 13px;
+  padding: 0 12px;
+  height: 28px;
+  font-size: 12px;
   color: var(--text);
   cursor: pointer;
+  transition: color 0.15s, background 0.15s;
 }
 
 .flat-button:hover {
@@ -588,10 +657,9 @@ button {
 }
 
 .status-dot {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
-  box-shadow: 0 0 0 5px color-mix(in srgb, currentColor 12%, transparent);
 }
 
 .status-dot.online {
@@ -645,21 +713,21 @@ button {
 
 .modal-header,
 .modal-footer {
-  padding: 16px 20px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--border-light);
 }
 
 .modal-header {
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 600;
   color: var(--text);
 }
 
 .modal-body {
   overflow: auto;
-  padding: 20px 22px;
+  padding: 16px 20px;
   display: grid;
-  gap: 16px;
+  gap: 14px;
 }
 
 .modal-footer {
@@ -684,34 +752,40 @@ button {
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--panel);
-  padding: 16px;
+  padding: 14px;
 }
 
 .section-title {
-  font-size: 16px;
-  font-weight: 700;
-  margin-bottom: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  color: var(--text);
 }
 
 .form-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .form-row {
   display: grid;
-  grid-template-columns: 140px minmax(0, 1fr) auto;
-  gap: 12px;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  gap: 10px;
   align-items: center;
 }
 
 .form-row.compact {
-  grid-template-columns: 140px minmax(0, 1fr);
+  grid-template-columns: 110px minmax(0, 1fr);
 }
 
 .field-label {
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 12px;
   color: var(--text);
+}
+
+.field-hint {
+  font-size: 11px;
 }
 
 .checkbox-grid {
@@ -724,15 +798,16 @@ button {
 .radio-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   color: var(--text);
+  font-size: 12px;
 }
 
 .checkbox-item input,
 .radio-item input {
   accent-color: var(--primary);
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 .group-list {
@@ -833,21 +908,21 @@ button {
   align-items: center;
   gap: 4px;
   height: 22px;
-  padding: 0 6px;
+  padding: 0 8px;
   border-radius: 4px;
   background: transparent;
   border: 1px solid var(--border);
-  color: var(--text-soft);
+  color: var(--text-muted);
   font-size: 12px;
   font-weight: normal;
   cursor: pointer;
-  transition: all 0.2s ease;
+  font-variant-numeric: tabular-nums;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 
 .captcha-button:hover {
   background: var(--card-hover-alt);
   color: var(--text);
-  border-color: var(--border-light);
 }
 
 .captcha-button.copied {

@@ -248,12 +248,23 @@ export function SettingsModal({
             <div className="version-text">版本号: <strong>{appVersion || "-"}</strong></div>
           </section>
         </div>
-        <div className="modal-footer">
-          <div className={`notice-text ${notice.type}`}>{notice.text || ""}</div>
-          <div className="footer-actions">
-            <button type="button" className="secondary-button" onClick={onTest} disabled={testing}>{testing ? "测试中..." : "测试连接"}</button>
-            <button type="button" className="primary-button" onClick={onSave} disabled={saving}>{saving ? "保存中..." : "保存"}</button>
-            <button type="button" className="ghost-button" onClick={onClose}>取消</button>
+        <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+            {notice.text ? (
+              <div className={`notice-text ${notice.type}`} style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}>
+                {notice.type === "info" ? (
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                )}
+                {notice.text}
+              </div>
+            ) : null}
+            <div className="footer-actions" style={{ display: "flex", gap: "8px" }}>
+              <button type="button" className="secondary-button" onClick={onTest} disabled={testing}>{testing ? "测试中..." : "测试连接"}</button>
+              <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>关闭</button>
+              <button type="button" className="primary-button" onClick={onSave} disabled={saving}>{saving ? "保存中..." : "保存设置"}</button>
+            </div>
           </div>
         </div>
       </div>

@@ -51,54 +51,49 @@ export function MessageCard({ item, appLabel, onToggleFavorite, formatDate }: Me
   return (
     <div className="message-card">
       <div className="message-priority" style={{ backgroundColor: priorityColor }}></div>
-      <div>
-        <div className="message-header" style={{ display: "block" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", minHeight: "28px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", flex: 1, minWidth: 0 }}>
-              <div className="message-title" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{item.title || "无标题"}</div>
-              <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
-                {code ? (
-                  <button
-                    type="button"
-                    className={`captcha-button ${copied ? "copied" : ""}`}
-                    onClick={copyCode}
-                    title="点击复制"
-                  >
-                    <svg viewBox="0 0 24 24" width="12" height="12" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                    </svg>
-                    {copied ? "已复制" : `复制: ${code}`}
-                  </button>
-                ) : null}
-              </div>
-            </div>
-            <div className="message-meta" style={{ flexShrink: 0 }}>
-              <span style={{ 
-                display: "inline-flex", alignItems: "center", height: "22px", padding: "0 8px", 
-                borderRadius: "4px", backgroundColor: "var(--card-hover-alt)", 
-                color: "var(--text-soft)", fontSize: "12px", marginRight: "8px" 
-              }}>
-                {appLabel || `应用 #${item.appid || 0}`}
-              </span>
+      <div className="message-content">
+        {/* Row 1: Title + meta */}
+        <div className="message-row1">
+          <div className="message-title-group">
+            <div className="message-title">{item.title || "无标题"}</div>
+            {code ? (
               <button
                 type="button"
-                className={`favorite-button ${item.favorite ? "active" : ""}`}
-                title={item.favorite ? "取消收藏" : "收藏"}
-                onClick={() => item.id && onToggleFavorite(item.id)}
+                className={`captcha-button ${copied ? "copied" : ""}`}
+                onClick={copyCode}
+                title="点击复制验证码"
               >
-                <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" fill={item.favorite ? "currentColor" : "none"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: "-1px" }}>
-                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                <svg viewBox="0 0 24 24" width="11" height="11" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
                 </svg>
+                {copied ? "已复制" : "复制验证码"}
               </button>
-              <span>{formatDate(item.date)}</span>
-            </div>
+            ) : null}
+          </div>
+          <div className="message-row1-right">
+            <span className="message-app-tag">{appLabel || `应用 #${item.appid || 0}`}</span>
+            <button
+              type="button"
+              className={`message-star ${item.favorite ? "active" : ""}`}
+              title={item.favorite ? "取消收藏" : "收藏"}
+              onClick={() => item.id && onToggleFavorite(item.id)}
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill={item.favorite ? "currentColor" : "none"} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+              </svg>
+            </button>
+            <span className="message-time">{formatDate(item.date)}</span>
           </div>
         </div>
+
+        {/* Row 2: Body */}
         <div className="message-body">{visibleMessage}</div>
+
+        {/* Row 3: Expand only */}
         {canCollapse ? (
-          <div className="message-actions" style={{ marginTop: "8px" }}>
-            <button type="button" className="link-button" style={{ marginTop: 0 }} onClick={() => setExpanded((prev) => !prev)}>
+          <div className="message-actions-row">
+            <button type="button" className="link-button" onClick={() => setExpanded((prev) => !prev)}>
               {expanded ? "收起" : "展开"}
             </button>
           </div>

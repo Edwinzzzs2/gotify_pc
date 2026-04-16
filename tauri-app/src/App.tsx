@@ -247,6 +247,14 @@ function MainApp() {
     return applications.find((item) => item.id === id)?.name || `应用 #${id}`;
   };
 
+  const handleToggleConnection = async () => {
+    try {
+      await desktopRuntime.toggleConnection();
+    } catch {
+      // ignore
+    }
+  };
+
   const refreshApplications = async () => {
     const apps = await desktopRuntime.getApplications();
     setApplications(Array.isArray(apps) ? apps : []);
@@ -393,7 +401,9 @@ function MainApp() {
                 </div>
               </div>
               <div className="footer-actions">
-                <button type="button" className="flat-button secondary-button" disabled>断开</button>
+                <button type="button" className="flat-button secondary-button" onClick={handleToggleConnection}>
+                  {status.phase === "online" || status.phase === "reconnecting" || status.phase === "connecting" ? "断开" : "连接"}
+                </button>
                 <button type="button" className="flat-button secondary-button" onClick={() => setSettingsOpen(true)}>设置</button>
                 <button type="button" className="flat-button danger-button" onClick={onClearMessages} disabled={visibleMessages.length === 0 || clearing}>{clearing ? "..." : "清空消息"}</button>
               </div>
