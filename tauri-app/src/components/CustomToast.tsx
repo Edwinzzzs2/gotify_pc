@@ -38,7 +38,7 @@ export function CustomToastCard({ toast, onClose, onCopyCode, onActivate }: Cust
             </span>
             {toast.subtitle && (
               <span className="feishu-toast-subtitle" title={toast.subtitle}>
-                ({toast.subtitle})
+                {toast.subtitle}
               </span>
             )}
           </div>

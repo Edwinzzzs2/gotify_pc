@@ -136,6 +136,12 @@ function MainApp() {
   }, [config.themeMode]);
 
   useEffect(() => {
+    if (settingsOpen) {
+      setSettingsNotice({ text: "", type: "info" });
+    }
+  }, [settingsOpen]);
+
+  useEffect(() => {
     let active = true;
     let unsubStatus = () => undefined;
     let unsubMessage = () => undefined;
@@ -263,7 +269,8 @@ function MainApp() {
   const onSave = async () => {
     setSaving(true);
     try {
-      const saved = await desktopRuntime.saveConfig(config);
+      const wait = new Promise((resolve) => window.setTimeout(resolve, 400));
+      const [saved] = await Promise.all([desktopRuntime.saveConfig(config), wait]);
       setConfig(saved);
       setSettingsNotice({ text: "设置已保存，正在应用新的桌面行为", type: "info" });
       await refreshApplications();
@@ -284,7 +291,8 @@ function MainApp() {
     }
     setTesting(true);
     try {
-      await desktopRuntime.testConnection({ serverUrl, clientToken });
+      const wait = new Promise((resolve) => window.setTimeout(resolve, 400));
+      await Promise.all([desktopRuntime.testConnection({ serverUrl, clientToken }), wait]);
       setSettingsNotice({ text: "连接测试成功", type: "info" });
     } catch (error) {
       setSettingsNotice({ text: `连接测试失败: ${error instanceof Error ? error.message : "未知错误"}`, type: "error" });

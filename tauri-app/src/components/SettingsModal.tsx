@@ -61,7 +61,10 @@ export function SettingsModal({
     <div className="modal-shell">
       <div className="modal-backdrop" onClick={onClose}></div>
       <div className="modal-card">
-        <div className="modal-header">Gotify 客户端设置</div>
+        <div className="modal-header">
+          <span>Gotify 客户端设置</span>
+          <span className="modal-version">{appVersion || "-"}</span>
+        </div>
         <div className="modal-body">
           <section className="section-card">
             <div className="section-title">服务器连接</div>
@@ -97,7 +100,7 @@ export function SettingsModal({
                   checked={config.showCustomNotification}
                   onChange={(event) => setConfig((prev) => ({ ...prev, showCustomNotification: event.target.checked }))}
                 />
-                <span>使用飞书风格弹窗卡片（主窗口可见时）</span>
+                <span>启用弹窗卡片</span>
               </label>
               <label className="checkbox-item">
                 <input type="checkbox" checked={config.playSound} onChange={(event) => setConfig((prev) => ({ ...prev, playSound: event.target.checked }))} />
@@ -245,26 +248,29 @@ export function SettingsModal({
                 <span>启动时显示主界面</span>
               </label>
             </div>
-            <div className="version-text">版本号: <strong>{appVersion || "-"}</strong></div>
           </section>
         </div>
-        <div className="modal-footer" style={{ display: "flex", justifyContent: "flex-end" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div className="modal-footer" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
             {notice.text ? (
-              <div className={`notice-text ${notice.type}`} style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "4px" }}>
+              <div className={`notice-text ${notice.type}`} style={{ fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
                 {notice.type === "info" ? (
-                  <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                  notice.text === "连接测试成功" ? (
+                    <span className="status-dot online" style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: "var(--success-color)", display: "inline-block" }}></span>
+                  ) : (
+                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                  )
                 ) : (
                   <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" fill="none" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
                 )}
                 {notice.text}
               </div>
             ) : null}
-            <div className="footer-actions" style={{ display: "flex", gap: "8px" }}>
-              <button type="button" className="secondary-button" onClick={onTest} disabled={testing}>{testing ? "测试中..." : "测试连接"}</button>
-              <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>关闭</button>
-              <button type="button" className="primary-button" onClick={onSave} disabled={saving}>{saving ? "保存中..." : "保存设置"}</button>
-            </div>
+          </div>
+          <div className="footer-actions" style={{ display: "flex", gap: "8px" }}>
+            <button type="button" className="secondary-button" onClick={onTest} disabled={testing}>{testing ? "正在测试..." : "测试连接"}</button>
+            <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>关闭</button>
+            <button type="button" className="primary-button" onClick={onSave} disabled={saving}>{saving ? "正在保存..." : "保存设置"}</button>
           </div>
         </div>
       </div>
