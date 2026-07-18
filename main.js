@@ -18,6 +18,8 @@ let storageDirPath = "";
 let applicationMap = new Map();
 let applicationList = [];
 let lastApplicationsFetchedAt = 0;
+// 是否以"隐藏到托盘"方式启动（开机自启或带 --hidden 参数时为 true）
+let startHiddenAtLaunch = false;
 const APP_NAME = "Gotify 客户端";
 const APP_USER_MODEL_ID = "com.gotify.client.desktop";
 
@@ -58,7 +60,6 @@ function resolveStorageDir() {
     if (preferredPath) {
       candidates.push(preferredPath);
     }
-    const
     // Portable mode check: if config.json exists in exe dir, prioritize it
     const exeDir = path.dirname(process.execPath);
     if (fs.existsSync(path.join(exeDir, "config.json"))) {
@@ -212,7 +213,8 @@ function createWindow() {
     minHeight: 520,
     icon: appIcon,
     backgroundColor: "#f7fafc",
-    show: Boolean(config.showMainWindowOnStartup),
+    // 开机自启（或带 --hidden）时不显示主窗口，仅驻留托盘；手动双击正常显示
+    show: Boolean(config.showMainWindowOnStartup) && !startHiddenAtLaunch,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -565,7 +567,8 @@ function setupIpc() {
       app.setLoginItemSettings({
         openAtLogin: saved.autoLaunch,
         path: process.execPath,
-        args: []
+        // 开机自启时带 --hidden，启动时据此最小化到托盘；关闭自启时不带参数
+        args: saved.autoLaunch ? ["--hidden"] : []
       });
     }
 
@@ -692,6 +695,11 @@ app.whenReady().then(() => {
   gotifyClient = new GotifyClient();
   bindGotifyEvents();
   setupIpc();
+  // 判断本次是否为开机自启（wasOpenedAtLogin）或带 --hidden 参数启动，
+  // 命中则将主窗口隐藏到托盘
+  const loginSettings = app.getLoginItemSettings();
+  startHiddenAtLaunch =
+    Boolean(loginSettings.wasOpenedAtLogin) || process.argv.includes("--hidden");
   createWindow();
   createTray();
   mainWindow?.webContents.on("did-finish-load", () => {
